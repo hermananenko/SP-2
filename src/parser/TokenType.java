@@ -14,4 +14,6 @@ public enum TokenType {
     INDENT,
     CHARACTER,
     STRING,
+    MINUS,
+    DIVISION,
 }

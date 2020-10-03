@@ -75,6 +75,15 @@ public class Lexer {
                         next();
                         addToken(TokenType.STRING, buffer.toString());
                         break;
+                    case '-':
+                        addToken(TokenType.MINUS);
+                        next();
+                        break;
+                    case '/':
+                        addToken(TokenType.DIVISION);
+                        next();
+                        break;
+                    default: throw new SyntaxException("Невідомий символ! Компіляцію зупинено.");
                 }
             }
         }

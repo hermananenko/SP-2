@@ -30,16 +30,53 @@ public class Parser {
         if (match(TokenType.DEF)) {
             return new DefStatement(get(0).getText(), returnStatement());
         }
-        throw new SysntaxExeption("Помилка при створенні функції");
+        throw new SyntaxException("Помилка при створенні функції");
     }
 
     private Statement returnStatement() {
         match(TokenType.ID); match(TokenType.OPEN_BRACKET); match(TokenType.CLOSE_BRACKET);
         match(TokenType.COLON); match(TokenType.INDENT);
         if (match(TokenType.RETURN)) {
-            return new ReturnStatement(primary());
+            return new ReturnStatement(expression());
         }
-        throw new SysntaxExeption("Помилка при створенні функції");
+        throw new SyntaxException("Помилка при створенні функції");
+    }
+
+    private Expression expression() {
+        return subtraction();
+    }
+
+    private Expression subtraction() {
+        Expression result = division();
+
+        while (true) {
+            if (match(TokenType.MINUS)) {
+                result = new BinaryExpression('-', result, division());
+                continue;
+            }
+            break;
+        }
+        return result;
+    }
+
+    private Expression division() {
+        Expression result = unary();
+
+        while (true) {
+            if (match(TokenType.DIVISION)) {
+                result = new BinaryExpression('/', result, unary());
+                continue;
+            }
+            break;
+        }
+        return result;
+    }
+
+    private Expression unary() {
+        if (match(TokenType.MINUS)) {
+            return new UnaryExpression('-', primary());
+        }
+        return primary();
     }
 
     private Expression primary() {
@@ -53,8 +90,13 @@ public class Parser {
         } else if (match(TokenType.CHARACTER)) {
             return new NumberExpression(current.getText().charAt(0));
         }
+        if (match(TokenType.OPEN_BRACKET)) {
+            Expression result = expression();
+            match(TokenType.CLOSE_BRACKET);
+            return result;
+        }
 
-        throw new SysntaxExeption("Неможливо привести до int");
+        throw new SyntaxException("Неможливо привести до int");
     }
 
     private boolean match(TokenType type) {
@@ -70,11 +112,5 @@ public class Parser {
             return EOF;
         }
         return tokens.get(position);
-    }
-
-    class SysntaxExeption extends RuntimeException {
-        public SysntaxExeption(String message) {
-            super(message);
-        }
     }
 }
