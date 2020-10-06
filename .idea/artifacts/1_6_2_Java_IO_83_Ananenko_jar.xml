@@ -1,8 +1,0 @@
-<component name="ArtifactManager">
-  <artifact type="jar" name="1_6-2-Java-IO-83-Ananenko:jar">
-    <output-path>$PROJECT_DIR$/out/artifacts/1_6_2_Java_IO_83_Ananenko_jar</output-path>
-    <root id="archive" name="1_6-2-Java-IO-83-Ananenko.jar">
-      <element id="module-output" name="1_6-2-Java-IO-83-Ananenko" />
-    </root>
-  </artifact>
-</component>
