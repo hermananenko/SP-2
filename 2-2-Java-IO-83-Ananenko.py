@@ -1,2 +1,2 @@
 def main():
-    return 2 + 2
+    return 100 / 30 / 3

@@ -9,14 +9,14 @@ includelib  C:\masm32\lib\masm32rt.lib
 .data
 .code
 main proc
-	mov edx, 0
-	mov ebx,4
-	mov ecx,10
-	sub ebx,ecx
-	mov ecx,5
-	sub ebx,ecx
-	mov eax,101
+	mov edx,0
+	mov eax,100
+	mov ebx,30
 	idiv ebx
+	mov edx,0
+	mov ebx,3
+	idiv ebx
+	mov edx,0
 	fn MessageBoxA,0,str$(eax),"1_6-2-Java-IO-83-Ananenko",MB_OK
 	ret
 main endp

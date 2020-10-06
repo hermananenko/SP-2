@@ -39,7 +39,7 @@ public class CodeGenerator {
         code.
                 append(def.getName()).
                 append(" proc\r\n").
-                append("\tmov edx, 0\r\n");
+                append("\tmov edx,0\r\n");
         ret((ReturnStatement) def.getReturnStatement());
         code.
                 append(def.getName()).
@@ -103,7 +103,8 @@ public class CodeGenerator {
         }
         if (bin.getOperation() == '/') {
             code.
-                    append("\tidiv " + "e" + child2 + "x\n");
+                    append("\tidiv " + "e" + child2 + "x\r\n").
+                    append("\tmov edx,0\r\n");
         }
     }
 
