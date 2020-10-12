@@ -16,4 +16,8 @@ public enum TokenType {
     STRING,
     MINUS,
     DIVISION,
+    EQ,
+    OR,
+    MUL,
+
 }

@@ -14,6 +14,8 @@ public class Lexer {
 
     private int pos;
 
+    private int line = 1;
+
     public Lexer(String input) {
         this.input = input;
         length = input.length();
@@ -22,6 +24,7 @@ public class Lexer {
 
         reserve(new Token(TokenType.DEF, "def"));
         reserve(new Token(TokenType.RETURN, "return"));
+        reserve(new Token(TokenType.OR, "or"));
     }
 
     private void reserve(Token t) {
@@ -56,6 +59,7 @@ public class Lexer {
                         while (temp == ' ') {
                             temp = next();
                         }
+                        line++;
                         break;
                     case '\'':
                         addToken(TokenType.CHARACTER, Character.toString(next()));
@@ -83,7 +87,16 @@ public class Lexer {
                         addToken(TokenType.DIVISION);
                         next();
                         break;
-                    default: throw new SyntaxException("Невідомий символ! Компіляцію зупинено.");
+                    case '=':
+                        addToken(TokenType.EQ);
+                        next();
+                        break;
+                    case '*':
+                        addToken(TokenType.MUL);
+                        next();
+                        break;
+                    default:
+                        throw new SyntaxException(String.format("Рядок %d : невідомий символ '%c'. Компіляцію зупинено.", line, current));
                 }
             }
         }
@@ -98,7 +111,10 @@ public class Lexer {
             current = next();
         }
         Token token = (Token) reserved.get(buffer.toString());
-        if (token != null) addToken(token);
+        if (token != null) {
+            token.setLine(line);
+            addToken(token);
+        }
         else addToken(TokenType.ID, buffer.toString());
     }
 
@@ -129,6 +145,9 @@ public class Lexer {
                 current = next();
             }
         }
+        if (Character.isLetter(current)) {
+            throw new SyntaxException(String.format("Рядок %d : ім'я ідентифікатора не може починатися з цифри. Компіляцію зупинено.", line));
+        }
 
         if (isReal) {
             addToken(TokenType.REAL, buffer.toString());
@@ -153,11 +172,11 @@ public class Lexer {
     }
 
     private void addToken(TokenType type) {
-        tokens.add(new Token(type, ""));
+        tokens.add(new Token(type, "", line));
     }
 
     private void addToken(TokenType type, String text) {
-        tokens.add(new Token(type, text));
+        tokens.add(new Token(type, text, line));
     }
 
     private void addToken(Token token) {

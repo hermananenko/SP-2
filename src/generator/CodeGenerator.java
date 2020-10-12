@@ -1,28 +1,37 @@
 package generator;
 
 import ast.*;
+import lib.Variables;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class CodeGenerator {
     private final List<Statement> ast;
     private final StringBuilder code = new StringBuilder();
-    private final String regs = "abcd";
+    private int varCount = 0;
+    private List<String> localVars = new ArrayList<>();
 
-    public CodeGenerator(List<Statement> ast, int mode) {
+    public CodeGenerator(List<Statement> ast) {
         this.ast = ast;
 
-        code.
-                append(".386\r\n").
-                append(".model flat, stdcall\r\n").
-                append("option casemap :none\r\n\r\n").
-                append("include     C:\\masm32\\include\\masm32rt.inc\r\n\r\n").
-                append("includelib  C:\\masm32\\lib\\masm32rt.lib\r\n\r\n").
-                append(".data\r\n").
-                append(".code\r\n");
+        code.append(".386\r\n");
+        code.append(".model flat, stdcall\r\n");
+        code.append("option casemap :none\r\n\r\n");
+        code.append("include     C:\\masm32\\include\\masm32rt.inc\r\n\r\n");
+        code.append("includelib  C:\\masm32\\lib\\masm32rt.lib\r\n\r\n");
+        code.append(".data\r\n");
+        code.append(".code\r\n\r\n");
+        code.append("orp proc\r\n");
+        code.append("\tcmp eax, 0\r\n");
+        code.append("\tje _there\r\n");
+        code.append("\tret\r\n");
+        code.append("_there:\r\n");
+        code.append("\tmov eax, ebx\r\n");
+        code.append("\tret\r\n");
+        code.append("orp endp\r\n\r\n");
         generate();
-        code.
-                append("end start");
+        code.append("end start");
     }
 
     public String getCode() {
@@ -36,93 +45,139 @@ public class CodeGenerator {
     }
 
     private void def(DefStatement def) {
-        code.
-                append(def.getName()).
-                append(" proc\r\n").
-                append("\tmov edx,0\r\n");
+        code.append(String.format("%s proc\r\n", def.getName()));
+        code.append("\tpush ebp\r\n");
+        code.append("\tmov ebp, esp\r\n");
+        if (def.getBody() != null) {
+            body(((BodyStatement) def.getBody()).getStatements());
+        }
         ret((ReturnStatement) def.getReturnStatement());
-        code.
-                append(def.getName()).
-                append(" endp\r\n").
-                append("start:\r\n").
-                append("\tinvoke ").
-                append(def.getName()).
-                append("\r\n").
-                append("\tinvoke ExitProcess,0\r\n");
+        code.append(String.format("%s endp\r\n", def.getName()));
+        code.append("start:\r\n");
+        code.append(String.format("\tinvoke %s\r\n", def.getName()));
+        code.append("\tinvoke ExitProcess,0\r\n");
+    }
+
+    private void body(List<Statement> statements) {
+        for (Statement st : statements) {
+            if (st instanceof AssignmentStatement) {
+                assignStatement((AssignmentStatement) st);
+            }
+        }
+    }
+
+    private void assignStatement(AssignmentStatement assignStatement) {
+        if (assignStatement.getExpression() instanceof BinaryExpression) {
+            binary((BinaryExpression) assignStatement.getExpression());
+        } else if (assignStatement.getExpression() instanceof UnaryExpression) {
+            unary((UnaryExpression) assignStatement.getExpression());
+        } else if (assignStatement.getExpression() instanceof NumberExpression) {
+            num((NumberExpression) assignStatement.getExpression());
+        } else if (assignStatement.getExpression() instanceof VariableExpression) {
+            var((VariableExpression) assignStatement.getExpression());
+        }
+
+        if (localVars.contains(assignStatement.getVariable())) {
+            int index = 4 * (varCount - Variables.getIndex(assignStatement.getVariable()));
+            code.append("\tpop eax\r\n");
+            code.append(String.format("\tmov dword ptr[ebp + %d], eax\r\n", index));
+        } else {
+            localVars.add(assignStatement.getVariable());
+            varCount++;
+            code.append("\tpop eax\r\n");
+            code.append("\tpop ebp\r\n");
+            code.append("\tpush eax\r\n");
+            code.append("\tpush ebp\r\n");
+            code.append("\tmov ebp, esp\r\n");
+        }
     }
 
     private void ret(ReturnStatement ret) {
         if (ret.getExpression() instanceof BinaryExpression) {
-            ((BinaryExpression) ret.getExpression()).setReg('a');
             binary((BinaryExpression) ret.getExpression());
         } else if (ret.getExpression() instanceof UnaryExpression) {
-            ((UnaryExpression) ret.getExpression()).setReg('a');
             unary((UnaryExpression) ret.getExpression());
         } else if (ret.getExpression() instanceof NumberExpression) {
-            ((NumberExpression) ret.getExpression()).setReg('a');
             num((NumberExpression) ret.getExpression());
+        } else if (ret.getExpression() instanceof VariableExpression) {
+            var((VariableExpression) ret.getExpression());
         }
-        code.
-                append("\tfn MessageBoxA,0,str$(eax),\"1_6-2-Java-IO-83-Ananenko\",MB_OK\r\n").
-                append("\tret\r\n");
+        code.append("\tpop eax\r\n");
+        code.append("\tpop ebp\r\n");
+        code.append("\tpop ebx\r\n".repeat(varCount));
+        code.append("\tfn MessageBoxA,0,str$(eax),\"1_6-2-Java-IO-83-Ananenko\",MB_OK\r\n");
+        code.append("\tret\r\n");
     }
 
     private void binary(BinaryExpression bin) {
-        char curReg = bin.getReg();
-        char child1 = regs.charAt(regs.indexOf(curReg));
-        char child2 = regs.charAt(regs.indexOf(curReg) + 1);
         if (bin.getExpr1() instanceof BinaryExpression) {
-            ((BinaryExpression) bin.getExpr1()).setReg(child1);
             binary((BinaryExpression) bin.getExpr1());
         }
-        if (bin.getExpr2() instanceof BinaryExpression) {
-            ((BinaryExpression) bin.getExpr2()).setReg(child2);
-            binary((BinaryExpression) bin.getExpr2());
-        }
         if (bin.getExpr1() instanceof UnaryExpression) {
-            ((UnaryExpression) bin.getExpr1()).setReg(child1);
             unary((UnaryExpression) bin.getExpr1());
         }
-        if (bin.getExpr2() instanceof UnaryExpression) {
-            ((UnaryExpression) bin.getExpr2()).setReg(child2);
-            unary((UnaryExpression) bin.getExpr2());
-        }
         if (bin.getExpr1() instanceof NumberExpression) {
-            ((NumberExpression) bin.getExpr1()).setReg(child1);
             num((NumberExpression) bin.getExpr1());
         }
+        if (bin.getExpr1() instanceof VariableExpression) {
+            var((VariableExpression) bin.getExpr1());
+        }
+        if (bin.getExpr2() instanceof BinaryExpression) {
+            binary((BinaryExpression) bin.getExpr2());
+        }
+        if (bin.getExpr2() instanceof UnaryExpression) {
+            unary((UnaryExpression) bin.getExpr2());
+        }
         if (bin.getExpr2() instanceof NumberExpression) {
-            ((NumberExpression) bin.getExpr2()).setReg(child2);
             num((NumberExpression) bin.getExpr2());
         }
+        if (bin.getExpr2() instanceof VariableExpression) {
+            var((VariableExpression) bin.getExpr2());
+        }
+        code.append("\tpop ebx\r\n");
+        code.append("\tpop eax\r\n");
         if (bin.getOperation() == '-') {
-            code.
-                    append("\tsub ").
-                    append("e" + child1 + "x,").
-                    append("e" + child2 + "x\r\n");
+            code.append("\tsub eax, ebx\r\n");
         }
         if (bin.getOperation() == '/') {
-            code.
-                    append("\tidiv " + "e" + child2 + "x\r\n").
-                    append("\tmov edx,0\r\n");
+            code.append("\tcdq\r\n");
+            code.append("\tidiv ebx\r\n");
         }
+        if (bin.getOperation() == '*') {
+            code.append("\timul ebx\r\n");
+        }
+        if (bin.getOperation() == 'o') {
+            code.append("\tcall orp\r\n");
+        }
+        code.append("\tpush eax\r\n");
     }
 
     private void unary(UnaryExpression un) {
         if (un.getExpr() instanceof BinaryExpression) {
-            ((BinaryExpression) un.getExpr()).setReg(un.getReg());
             binary((BinaryExpression) un.getExpr());
         }
         if (un.getExpr() instanceof NumberExpression) {
-            ((NumberExpression) un.getExpr()).setReg(un.getReg());
             num((NumberExpression) un.getExpr());
         }
-        code.
-                append("\tnot edx\r\n").
-                append("\tneg " + "e" + un.getReg() + "x\r\n");
+        if (un.getExpr() instanceof VariableExpression) {
+            var((VariableExpression) un.getExpr());
+        }
+        if (un.getExpr() instanceof UnaryExpression) {
+            unary((UnaryExpression) un.getExpr());
+        }
+        code.append("\tpop eax\r\n");
+        code.append("\tneg eax\r\n");
+        code.append("\tpush eax\r\n");
     }
 
     private void num(NumberExpression num) {
-        code.append("\tmov " + "e" + num.getReg() + "x," + num.getValue() + "\r\n");
+        code.append(String.format("\tmov eax, %d\r\n", num.getValue()));
+        code.append("\tpush eax\r\n");
+    }
+
+    private void var(VariableExpression var) {
+        int index = 4 * (varCount - Variables.getIndex(var.getName()));
+        code.append(String.format("\tmov eax, [ebp+%d]\r\n", index));
+        code.append("\tpush eax\r\n");
     }
 }

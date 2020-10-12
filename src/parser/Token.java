@@ -1,11 +1,14 @@
 package parser;
 
 public class Token {
-    private TokenType type;
-    private String text;
+    private final TokenType type;
+    private final String text;
+    private int line;
 
-    public Token() {
-
+    public Token(TokenType type, String text, int line) {
+        this.type = type;
+        this.text = text;
+        this.line = line;
     }
 
     public Token(TokenType type, String text) {
@@ -17,16 +20,16 @@ public class Token {
         return type;
     }
 
-    public void setType(TokenType type) {
-        this.type = type;
-    }
-
     public String getText() {
         return text;
     }
 
-    public void setText(String text) {
-        this.text = text;
+    public void setLine(int line) {
+        this.line = line;
+    }
+
+    public int getLine() {
+        return line;
     }
 
     @Override
