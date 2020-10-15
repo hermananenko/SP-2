@@ -111,6 +111,7 @@ public class Parser {
             }
             if (match(TokenType.MUL)) {
                 result = new BinaryExpression('*', result, unary());
+                continue;
             }
             break;
         }

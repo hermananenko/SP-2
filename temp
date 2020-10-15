@@ -1,7 +1,0 @@
-def main():
-    a = 5
-    b = 0b111
-    c = a or b
-    d = c * 6
-    e = -d / 10
-    return e * b
