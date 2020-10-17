@@ -1,7 +1,6 @@
 package generator;
 
 import ast.*;
-import lib.Variables;
 
 import java.util.ArrayList;
 import java.util.List;
