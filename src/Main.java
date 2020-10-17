@@ -1,6 +1,5 @@
 import ast.Statement;
 import generator.CodeGenerator;
-import lib.Variables;
 import parser.Lexer;
 import parser.Parser;
 import parser.Token;

@@ -9,9 +9,7 @@ import java.util.List;
 public class CodeGenerator {
     private final List<Statement> ast;
     private final StringBuilder code = new StringBuilder();
-    private int varCount = 0;
-    private List<String> localVars = new ArrayList<>();
-    private List<String> blockVars;
+    int conditionalCount = 0;
 
     public CodeGenerator(List<Statement> ast) {
         this.ast = ast;
@@ -55,7 +53,9 @@ public class CodeGenerator {
         if (def.getBody() != null) {
             body(((BodyStatement) def.getBody()));
         }
-        ret((ReturnStatement) def.getReturnStatement());
+        if (def.getReturnStatement() != null) {
+            ret((ReturnStatement) def.getReturnStatement());
+        }
         code.append(String.format("%s endp\r\n", def.getName()));
         code.append("start:\r\n");
         code.append(String.format("\tinvoke %s\r\n", def.getName()));
@@ -64,10 +64,15 @@ public class CodeGenerator {
 
     private void body(BodyStatement bodyStatement) {
         List<Statement> statements = bodyStatement.getStatements();
-        blockVars = bodyStatement.getVariables();
         for (Statement st : statements) {
             if (st instanceof AssignmentStatement) {
                 assignStatement((AssignmentStatement) st);
+            }
+            if (st instanceof IfStatement) {
+                ifStatement((IfStatement) st);
+            }
+            if (st instanceof ReturnStatement) {
+                ret((ReturnStatement) st);
             }
         }
     }
@@ -82,20 +87,35 @@ public class CodeGenerator {
         } else if (assignStatement.getExpression() instanceof VariableExpression) {
             var((VariableExpression) assignStatement.getExpression());
         }
-
-//        if (localVars.contains(assignStatement.getVariable())) {
         int index = 4 * (Variables.getIndex(assignStatement.getVariable()) + 1);
         code.append("\tpop eax\r\n");
         code.append(String.format("\tmov dword ptr[ebp + %d], eax\r\n", index));
-//        } else {
-//            localVars.add(assignStatement.getVariable());
-//            varCount++;
-//            code.append("\tpop eax\r\n");
-//            code.append("\tpop ebp\r\n");
-//            code.append("\tpush eax\r\n");
-//            code.append("\tpush ebp\r\n");
-//            code.append("\tmov ebp, esp\r\n");
-//        }
+    }
+
+    private void ifStatement(IfStatement ifStatement) {
+        int thisCondCount = conditionalCount++;
+        if (ifStatement.getExpression() instanceof BinaryExpression) {
+            binary((BinaryExpression) ifStatement.getExpression());
+        } else if (ifStatement.getExpression() instanceof UnaryExpression) {
+            unary((UnaryExpression) ifStatement.getExpression());
+        } else if (ifStatement.getExpression() instanceof NumberExpression) {
+            num((NumberExpression) ifStatement.getExpression());
+        } else if (ifStatement.getExpression() instanceof VariableExpression) {
+            var((VariableExpression) ifStatement.getExpression());
+        }
+        code.append("\tpop eax\r\n");
+        code.append("\tcmp eax, 0\r\n");
+        if (ifStatement.getElseStatement() != null) {
+            code.append(String.format("\tje else_%d\r\n", thisCondCount));
+            body((BodyStatement) ifStatement.getIfStatement());
+            code.append(String.format("\tjmp normal_%d\r\n", thisCondCount));
+            code.append(String.format("else_%d:\r\n", thisCondCount));
+            body((BodyStatement) ifStatement.getElseStatement());
+        } else {
+            code.append(String.format("\tje normal_%d\r\n", thisCondCount));
+            body((BodyStatement) ifStatement.getIfStatement());
+        }
+        code.append(String.format("normal_%d:\r\n", thisCondCount));
     }
 
     private void ret(ReturnStatement ret) {
@@ -110,7 +130,7 @@ public class CodeGenerator {
         }
         code.append("\tpop eax\r\n");
         code.append("\tpop ebp\r\n");
-        code.append("\tpop ebx\r\n".repeat(varCount));
+        code.append("\tpop ebx\r\n".repeat(Variables.getVariables().size()));
         code.append("\tfn MessageBoxA,0,str$(eax),\"1_6-2-Java-IO-83-Ananenko\",MB_OK\r\n");
         code.append("\tret\r\n");
     }

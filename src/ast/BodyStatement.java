@@ -5,7 +5,7 @@ import java.util.List;
 
 public class BodyStatement implements Statement {
     private final List<Statement> statements;
-    private List<String> variables;
+    private final List<String> variables;
 
     public BodyStatement() {
         statements = new ArrayList<>();

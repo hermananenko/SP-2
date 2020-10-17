@@ -31,35 +31,29 @@ public class Parser {
         if (match(TokenType.DEF)) {
             String name = get(0).getText();
             consume(TokenType.ID); consume(TokenType.OPEN_BRACKET);
-            consume(TokenType.CLOSE_BRACKET); consume(TokenType.COLON); consume(TokenType.INDENT);
-            Statement body;
-            if (get(0).getType() == TokenType.RETURN) {
-                body = null;
-            } else {
-                body = functionBody();
+            consume(TokenType.CLOSE_BRACKET); consume(TokenType.COLON);
+            Statement body = null;
+            Statement ret = null;
+
+            if (!(get(1).getType() == TokenType.RETURN)) {
+                body = block(null);
             }
-            return new DefStatement(name, body, returnStatement((BodyStatement) body));
+            if ((get(1).getType() == TokenType.RETURN)) {
+                consume(TokenType.INDENT);
+                consume(TokenType.RETURN);
+                ret = returnStatement((BodyStatement) body);
+            }
+            return new DefStatement(name, body, ret);
         }
         return null;
     }
 
-    private Statement functionBody() {
-        final BodyStatement body = new BodyStatement();
-        while (! (get(0).getType() == TokenType.RETURN)) {
-            if (match(TokenType.IF)) {
-                body.add(ifElse(body));
-            } else {
-                body.add(assignmentStatement(body));
-                consume(TokenType.INDENT);
-            }
-        }
-        return body;
-    }
-
     private Statement block(BodyStatement parent) {
         final BodyStatement block = new BodyStatement();
-        for (String parentVar : parent.getVariables()) {
-            block.addVariable(parentVar);
+        if (parent != null) {
+            for (String parentVar : parent.getVariables()) {
+                block.addVariable(parentVar);
+            }
         }
         boolean isFirstIteration = true;
         int blockInd = 0;
@@ -68,22 +62,30 @@ public class Parser {
             blockInd++;
         }
         currInd = blockInd;
-        while (true) {
-            if (!isFirstIteration) {
-                while (match(TokenType.INDENT)) {
-                    currInd++;
-                }
+        while (get(1).getType() != TokenType.EOF) {
+            while (get(currInd).getType() == TokenType.INDENT && !isFirstIteration) {
+                currInd++;
             }
-            isFirstIteration = false;
+
             if (currInd != blockInd) {
+                if (get(currInd).getType() == TokenType.ELSE) {
+                    while (match(TokenType.INDENT)) { }
+                }
                 break;
+            } else {
+                while (match(TokenType.INDENT)) { }
             }
-            currInd = 0;
+
             if (match(TokenType.IF)) {
                 block.add(ifElse(block));
+            } else if (match(TokenType.RETURN)) {
+                block.add(returnStatement(block));
             } else {
                 block.add(assignmentStatement(block));
             }
+
+            isFirstIteration = false;
+            currInd = 0;
         }
         return block;
     }
@@ -129,10 +131,7 @@ public class Parser {
     }
 
     private Statement returnStatement(BodyStatement block) {
-        if (match(TokenType.RETURN)) {
             return new ReturnStatement(expression(block));
-        }
-        return null;
     }
 
     private Expression expression(BodyStatement block) {
