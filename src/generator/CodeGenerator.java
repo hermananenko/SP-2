@@ -11,6 +11,7 @@ public class CodeGenerator {
     private final StringBuilder code = new StringBuilder();
     private int varCount = 0;
     private List<String> localVars = new ArrayList<>();
+    private List<String> blockVars;
 
     public CodeGenerator(List<Statement> ast) {
         this.ast = ast;
@@ -46,10 +47,13 @@ public class CodeGenerator {
 
     private void def(DefStatement def) {
         code.append(String.format("%s proc\r\n", def.getName()));
+        for (String str : Variables.getVariables()) {
+            code.append("\tpush 0\r\n");
+        }
         code.append("\tpush ebp\r\n");
         code.append("\tmov ebp, esp\r\n");
         if (def.getBody() != null) {
-            body(((BodyStatement) def.getBody()).getStatements());
+            body(((BodyStatement) def.getBody()));
         }
         ret((ReturnStatement) def.getReturnStatement());
         code.append(String.format("%s endp\r\n", def.getName()));
@@ -58,7 +62,9 @@ public class CodeGenerator {
         code.append("\tinvoke ExitProcess,0\r\n");
     }
 
-    private void body(List<Statement> statements) {
+    private void body(BodyStatement bodyStatement) {
+        List<Statement> statements = bodyStatement.getStatements();
+        blockVars = bodyStatement.getVariables();
         for (Statement st : statements) {
             if (st instanceof AssignmentStatement) {
                 assignStatement((AssignmentStatement) st);
@@ -77,19 +83,19 @@ public class CodeGenerator {
             var((VariableExpression) assignStatement.getExpression());
         }
 
-        if (localVars.contains(assignStatement.getVariable())) {
-            int index = 4 * (varCount - Variables.getIndex(assignStatement.getVariable()));
-            code.append("\tpop eax\r\n");
-            code.append(String.format("\tmov dword ptr[ebp + %d], eax\r\n", index));
-        } else {
-            localVars.add(assignStatement.getVariable());
-            varCount++;
-            code.append("\tpop eax\r\n");
-            code.append("\tpop ebp\r\n");
-            code.append("\tpush eax\r\n");
-            code.append("\tpush ebp\r\n");
-            code.append("\tmov ebp, esp\r\n");
-        }
+//        if (localVars.contains(assignStatement.getVariable())) {
+        int index = 4 * (Variables.getIndex(assignStatement.getVariable()) + 1);
+        code.append("\tpop eax\r\n");
+        code.append(String.format("\tmov dword ptr[ebp + %d], eax\r\n", index));
+//        } else {
+//            localVars.add(assignStatement.getVariable());
+//            varCount++;
+//            code.append("\tpop eax\r\n");
+//            code.append("\tpop ebp\r\n");
+//            code.append("\tpush eax\r\n");
+//            code.append("\tpush ebp\r\n");
+//            code.append("\tmov ebp, esp\r\n");
+//        }
     }
 
     private void ret(ReturnStatement ret) {
@@ -176,7 +182,7 @@ public class CodeGenerator {
     }
 
     private void var(VariableExpression var) {
-        int index = 4 * (varCount - Variables.getIndex(var.getName()));
+        int index = 4 * (Variables.getIndex(var.getName()) + 1);
         code.append(String.format("\tmov eax, [ebp+%d]\r\n", index));
         code.append("\tpush eax\r\n");
     }

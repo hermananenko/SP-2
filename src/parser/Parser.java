@@ -36,51 +36,115 @@ public class Parser {
             if (get(0).getType() == TokenType.RETURN) {
                 body = null;
             } else {
-                body = body();
+                body = functionBody();
             }
-            return new DefStatement(name, body, returnStatement());
+            return new DefStatement(name, body, returnStatement((BodyStatement) body));
         }
         return null;
     }
 
-    private Statement body() {
+    private Statement functionBody() {
         final BodyStatement body = new BodyStatement();
         while (! (get(0).getType() == TokenType.RETURN)) {
-            body.add(assignmentStatement());
-            consume(TokenType.INDENT);
+            if (match(TokenType.IF)) {
+                body.add(ifElse(body));
+            } else {
+                body.add(assignmentStatement(body));
+                consume(TokenType.INDENT);
+            }
         }
         return body;
     }
 
-    private Statement assignmentStatement() {
+    private Statement block(BodyStatement parent) {
+        final BodyStatement block = new BodyStatement();
+        for (String parentVar : parent.getVariables()) {
+            block.addVariable(parentVar);
+        }
+        boolean isFirstIteration = true;
+        int blockInd = 0;
+        int currInd;
+        while (match(TokenType.INDENT)) {
+            blockInd++;
+        }
+        currInd = blockInd;
+        while (true) {
+            if (!isFirstIteration) {
+                while (match(TokenType.INDENT)) {
+                    currInd++;
+                }
+            }
+            isFirstIteration = false;
+            if (currInd != blockInd) {
+                break;
+            }
+            currInd = 0;
+            if (match(TokenType.IF)) {
+                block.add(ifElse(block));
+            } else {
+                block.add(assignmentStatement(block));
+            }
+        }
+        return block;
+    }
+
+    private Statement assignmentStatement(BodyStatement block) {
         final Token current = get(0);
 
         if (match(TokenType.ID) && get(0).getType() == TokenType.EQ) {
             final String variable = current.getText();
             consume(TokenType.EQ);
-            Variables.add(variable);
-            return new AssignmentStatement(variable, expression());
+            if (!Variables.isExists(variable)) {
+                Variables.add(variable);
+            }
+            if (!block.isExist(variable)) {
+                block.addVariable(variable);
+            }
+            return new AssignmentStatement(variable, expression(block));
         }
         return null;
     }
 
-    private Statement returnStatement() {
+    private Statement ifElse(BodyStatement block) {
+        consume(TokenType.OPEN_BRACKET);
+        final Expression condition = expression(block);
+        consume(TokenType.CLOSE_BRACKET);
+        consume(TokenType.COLON);
+        final Statement ifStatement = block(block);
+        final Statement elseStatement;
+        if (match(TokenType.ELSE)) {
+            match(TokenType.COLON);
+            elseStatement = block(block);
+            for (String ifVar : ((BodyStatement) ifStatement).getVariables()) {
+                for (String elsVar : ((BodyStatement) elseStatement).getVariables()) {
+                    if (ifVar.equals(elsVar) && !block.isExist(ifVar)) {
+                        block.addVariable(ifVar);
+                    }
+                }
+            }
+        } else {
+            elseStatement = null;
+        }
+        return new IfStatement(condition, ifStatement, elseStatement);
+    }
+
+    private Statement returnStatement(BodyStatement block) {
         if (match(TokenType.RETURN)) {
-            return new ReturnStatement(expression());
+            return new ReturnStatement(expression(block));
         }
         return null;
     }
 
-    private Expression expression() {
-        return logical();
+    private Expression expression(BodyStatement block) {
+        return logical(block);
     }
 
-    private Expression logical() {
-        Expression result = subtraction();
+    private Expression logical(BodyStatement block) {
+        Expression result = subtraction(block);
 
         while (true) {
             if (match(TokenType.OR)) {
-                result = new BinaryExpression('o', result, subtraction());
+                result = new BinaryExpression('o', result, subtraction(block));
                 continue;
             }
             break;
@@ -88,12 +152,12 @@ public class Parser {
         return result;
     }
 
-    private Expression subtraction() {
-        Expression result = division();
+    private Expression subtraction(BodyStatement block) {
+        Expression result = division(block);
 
         while (true) {
             if (match(TokenType.MINUS)) {
-                result = new BinaryExpression('-', result, division());
+                result = new BinaryExpression('-', result, division(block));
                 continue;
             }
             break;
@@ -101,16 +165,16 @@ public class Parser {
         return result;
     }
 
-    private Expression division() {
-        Expression result = unary();
+    private Expression division(BodyStatement block) {
+        Expression result = unary(block);
 
         while (true) {
             if (match(TokenType.DIVISION)) {
-                result = new BinaryExpression('/', result, unary());
+                result = new BinaryExpression('/', result, unary(block));
                 continue;
             }
             if (match(TokenType.MUL)) {
-                result = new BinaryExpression('*', result, unary());
+                result = new BinaryExpression('*', result, unary(block));
                 continue;
             }
             break;
@@ -118,22 +182,22 @@ public class Parser {
         return result;
     }
 
-    private Expression unary() {
+    private Expression unary(BodyStatement block) {
         if (match(TokenType.MINUS)) {
             if (get(0).getType() == TokenType.MINUS) {
-                return new UnaryExpression('-', unary());
+                return new UnaryExpression('-', unary(block));
             }
-            return new UnaryExpression('-', primary());
+            return new UnaryExpression('-', primary(block));
         }
-        return primary();
+        return primary(block);
     }
 
-    private Expression primary() {
+    private Expression primary(BodyStatement block) {
         final Token current = get(0);
         if (match(TokenType.NUM)) {
             return new NumberExpression(Integer.parseInt(current.getText()));
         } else if (match(TokenType.ID)){
-            if (Variables.isExists(current.getText())) {
+            if (block.isExist(current.getText())) {
                 return new VariableExpression(current.getText());
             } else {
                 throw new SyntaxException(String.format("Рядок %d : Змінної \"%s\" не знайдено!", current.getLine(), current.getText()));
@@ -146,7 +210,7 @@ public class Parser {
             return new NumberExpression(current.getText().charAt(0));
         }
         if (match(TokenType.OPEN_BRACKET)) {
-            Expression result = expression();
+            Expression result = expression(block);
             match(TokenType.CLOSE_BRACKET);
             return result;
         }

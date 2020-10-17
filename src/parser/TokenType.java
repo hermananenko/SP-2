@@ -19,5 +19,7 @@ public enum TokenType {
     EQ,
     OR,
     MUL,
+    IF,
+    ELSE,
 
 }

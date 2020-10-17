@@ -25,6 +25,8 @@ public class Lexer {
         reserve(new Token(TokenType.DEF, "def"));
         reserve(new Token(TokenType.RETURN, "return"));
         reserve(new Token(TokenType.OR, "or"));
+        reserve(new Token(TokenType.IF, "if"));
+        reserve(new Token(TokenType.ELSE, "else"));
     }
 
     private void reserve(Token t) {
@@ -32,6 +34,9 @@ public class Lexer {
     }
 
     public List<Token> tokenize() {
+        List<Integer> indents = new ArrayList<>();
+        int prevIndent = 0;
+        int currIndent = 0;
         while (pos < length) {
             final char current = peek(0);
             if (Character.isDigit(current)) tokenizeNumber();
@@ -55,9 +60,19 @@ public class Lexer {
                         break;
                     case '\n':
                         char temp;
-                        if ((temp = next()) == ' ') addToken(TokenType.INDENT);
-                        while (temp == ' ') {
-                            temp = next();
+                        if ((temp = next()) == ' ') {
+                            while (temp == ' ') {
+                                currIndent++;
+                                temp = next();
+                            }
+                            if (currIndent > prevIndent) {
+                                indents.add(currIndent);
+                            }
+                            for (int i = 0; i < indents.indexOf(currIndent) + 1; i++) {
+                                addToken(TokenType.INDENT);
+                            }
+                            prevIndent = indents.get(indents.indexOf(currIndent));
+                            currIndent = 0;
                         }
                         line++;
                         break;

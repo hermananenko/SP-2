@@ -14,6 +14,10 @@ public class Variables {
         return variables.contains(name);
     }
 
+    public static List<String> getVariables() {
+        return variables;
+    }
+
     public static int getIndex(String name) {
         return variables.indexOf(name);
     }
