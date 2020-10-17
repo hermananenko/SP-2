@@ -9,10 +9,19 @@ import java.util.List;
 public class CodeGenerator {
     private final List<Statement> ast;
     private final StringBuilder code = new StringBuilder();
-    int conditionalCount = 0;
+    private List<String> Variables;
+
+    private int conditionalCount = 0;
 
     public CodeGenerator(List<Statement> ast) {
         this.ast = ast;
+
+        String nameCallFunction = "test";
+        for (Statement st : ast) {
+            if (((DefStatement) st).getBody() == null) {
+                nameCallFunction = ((DefStatement) st).getName();
+            }
+        }
 
         code.append(".386\r\n");
         code.append(".model flat, stdcall\r\n");
@@ -30,6 +39,10 @@ public class CodeGenerator {
         code.append("\tret\r\n");
         code.append("orp endp\r\n\r\n");
         generate();
+        code.append("start:\r\n");
+        code.append(String.format("\tinvoke %s\r\n", nameCallFunction));
+        code.append("\tfn MessageBoxA,0,str$(eax),\"1_6-2-Java-IO-83-Ananenko\",MB_OK\r\n");
+        code.append("\tinvoke ExitProcess,0\r\n");
         code.append("end start");
     }
 
@@ -39,27 +52,22 @@ public class CodeGenerator {
 
     private void generate() {
         for (Statement st : ast) {
-            def((DefStatement) st);
+            if (((DefStatement) st).getBody() != null) {
+                def((DefStatement) st);
+            }
         }
     }
 
     private void def(DefStatement def) {
         code.append(String.format("%s proc\r\n", def.getName()));
-        for (String str : Variables.getVariables()) {
+        Variables = ((BodyStatement) def.getBody()).getVariables();
+        for (String str : Variables) {
             code.append("\tpush 0\r\n");
         }
         code.append("\tpush ebp\r\n");
         code.append("\tmov ebp, esp\r\n");
-        if (def.getBody() != null) {
-            body(((BodyStatement) def.getBody()));
-        }
-        if (def.getReturnStatement() != null) {
-            ret((ReturnStatement) def.getReturnStatement());
-        }
-        code.append(String.format("%s endp\r\n", def.getName()));
-        code.append("start:\r\n");
-        code.append(String.format("\tinvoke %s\r\n", def.getName()));
-        code.append("\tinvoke ExitProcess,0\r\n");
+        body(((BodyStatement) def.getBody()));
+        code.append(String.format("%s endp\r\n\r\n", def.getName()));
     }
 
     private void body(BodyStatement bodyStatement) {
@@ -86,8 +94,10 @@ public class CodeGenerator {
             num((NumberExpression) assignStatement.getExpression());
         } else if (assignStatement.getExpression() instanceof VariableExpression) {
             var((VariableExpression) assignStatement.getExpression());
+        } else if (assignStatement.getExpression() instanceof DefExpression) {
+            defCall((DefExpression) assignStatement.getExpression());
         }
-        int index = 4 * (Variables.getIndex(assignStatement.getVariable()) + 1);
+        int index = 4 * (Variables.indexOf(assignStatement.getVariable()) + 1);
         code.append("\tpop eax\r\n");
         code.append(String.format("\tmov dword ptr[ebp + %d], eax\r\n", index));
     }
@@ -102,6 +112,8 @@ public class CodeGenerator {
             num((NumberExpression) ifStatement.getExpression());
         } else if (ifStatement.getExpression() instanceof VariableExpression) {
             var((VariableExpression) ifStatement.getExpression());
+        } else if (ifStatement.getExpression() instanceof DefExpression) {
+            defCall((DefExpression) ifStatement.getExpression());
         }
         code.append("\tpop eax\r\n");
         code.append("\tcmp eax, 0\r\n");
@@ -127,11 +139,12 @@ public class CodeGenerator {
             num((NumberExpression) ret.getExpression());
         } else if (ret.getExpression() instanceof VariableExpression) {
             var((VariableExpression) ret.getExpression());
+        } else if (ret.getExpression() instanceof DefExpression) {
+            defCall((DefExpression) ret.getExpression());
         }
         code.append("\tpop eax\r\n");
         code.append("\tpop ebp\r\n");
-        code.append("\tpop ebx\r\n".repeat(Variables.getVariables().size()));
-        code.append("\tfn MessageBoxA,0,str$(eax),\"1_6-2-Java-IO-83-Ananenko\",MB_OK\r\n");
+        code.append("\tpop ebx\r\n".repeat(Variables.size()));
         code.append("\tret\r\n");
     }
 
@@ -148,6 +161,9 @@ public class CodeGenerator {
         if (bin.getExpr1() instanceof VariableExpression) {
             var((VariableExpression) bin.getExpr1());
         }
+        if (bin.getExpr1() instanceof DefExpression) {
+            defCall((DefExpression) bin.getExpr1());
+        }
         if (bin.getExpr2() instanceof BinaryExpression) {
             binary((BinaryExpression) bin.getExpr2());
         }
@@ -159,6 +175,9 @@ public class CodeGenerator {
         }
         if (bin.getExpr2() instanceof VariableExpression) {
             var((VariableExpression) bin.getExpr2());
+        }
+        if (bin.getExpr2() instanceof DefExpression) {
+            defCall((DefExpression) bin.getExpr2());
         }
         code.append("\tpop ebx\r\n");
         code.append("\tpop eax\r\n");
@@ -191,6 +210,9 @@ public class CodeGenerator {
         if (un.getExpr() instanceof UnaryExpression) {
             unary((UnaryExpression) un.getExpr());
         }
+        if (un.getExpr() instanceof DefExpression) {
+            defCall((DefExpression) un.getExpr());
+        }
         code.append("\tpop eax\r\n");
         code.append("\tneg eax\r\n");
         code.append("\tpush eax\r\n");
@@ -202,8 +224,13 @@ public class CodeGenerator {
     }
 
     private void var(VariableExpression var) {
-        int index = 4 * (Variables.getIndex(var.getName()) + 1);
+        int index = 4 * (Variables.indexOf(var.getName()) + 1);
         code.append(String.format("\tmov eax, [ebp+%d]\r\n", index));
+        code.append("\tpush eax\r\n");
+    }
+
+    private void defCall(DefExpression defExpression) {
+        code.append(String.format("\tcall %s\r\n", defExpression.getName()));
         code.append("\tpush eax\r\n");
     }
 }

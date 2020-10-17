@@ -1,7 +1,6 @@
 package parser;
 
 import ast.*;
-import lib.Variables;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +13,8 @@ public class Parser {
     private final int size;
     private int pos;
 
+    private final List<String> defNames = new ArrayList<>();
+
     public Parser(List<Token> tokens) {
         this.tokens = tokens;
         size = tokens.size();
@@ -22,30 +23,26 @@ public class Parser {
     public List<Statement> parse() {
         final List<Statement> result = new ArrayList<>();
         while (!match(TokenType.EOF)) {
-            result.add(defStatement());
+            if (match(TokenType.DEF)) {
+                result.add(defStatement());
+            } else if (get(0).getType() == TokenType.ID) {
+                String name = get(0).getText();
+                consume(TokenType.ID);
+                consume(TokenType.OPEN_BRACKET);
+                consume(TokenType.CLOSE_BRACKET);
+                result.add(new DefStatement(name, null));
+            }
         }
         return result;
     }
 
     private Statement defStatement() {
-        if (match(TokenType.DEF)) {
-            String name = get(0).getText();
-            consume(TokenType.ID); consume(TokenType.OPEN_BRACKET);
-            consume(TokenType.CLOSE_BRACKET); consume(TokenType.COLON);
-            Statement body = null;
-            Statement ret = null;
+        String name = get(0).getText();
+        consume(TokenType.ID); consume(TokenType.OPEN_BRACKET);
+        consume(TokenType.CLOSE_BRACKET); consume(TokenType.COLON);
+        defNames.add(name);
 
-            if (!(get(1).getType() == TokenType.RETURN)) {
-                body = block(null);
-            }
-            if ((get(1).getType() == TokenType.RETURN)) {
-                consume(TokenType.INDENT);
-                consume(TokenType.RETURN);
-                ret = returnStatement((BodyStatement) body);
-            }
-            return new DefStatement(name, body, ret);
-        }
-        return null;
+        return new DefStatement(name, block(null));
     }
 
     private Statement block(BodyStatement parent) {
@@ -96,9 +93,6 @@ public class Parser {
         if (match(TokenType.ID) && get(0).getType() == TokenType.EQ) {
             final String variable = current.getText();
             consume(TokenType.EQ);
-            if (!Variables.isExists(variable)) {
-                Variables.add(variable);
-            }
             if (!block.isExist(variable)) {
                 block.addVariable(variable);
             }
@@ -196,6 +190,15 @@ public class Parser {
         if (match(TokenType.NUM)) {
             return new NumberExpression(Integer.parseInt(current.getText()));
         } else if (match(TokenType.ID)){
+            if (get(0).getType() == TokenType.OPEN_BRACKET) {
+                consume(TokenType.OPEN_BRACKET);
+                consume(TokenType.CLOSE_BRACKET);
+                if (defNames.contains(current.getText())) {
+                    return new DefExpression(current.getText());
+                } else {
+                    throw new SyntaxException(String.format("Рядок %d : Функції \"%s\" не знайдено!", current.getLine(), current.getText()));
+                }
+            }
             if (block.isExist(current.getText())) {
                 return new VariableExpression(current.getText());
             } else {
