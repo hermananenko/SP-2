@@ -77,8 +77,10 @@ public class Parser {
                 block.add(ifElse(block));
             } else if (match(TokenType.RETURN)) {
                 block.add(returnStatement(block));
-            } else {
+            } else if (get(1).getType() == TokenType.EQ) {
                 block.add(assignmentStatement(block));
+            } else {
+                throw new SyntaxException(String.format("Рядок %d : Невідома операція!", get(0).getLine()));
             }
 
             isFirstIteration = false;

@@ -2,7 +2,6 @@ package generator;
 
 import ast.*;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class CodeGenerator {
@@ -84,18 +83,22 @@ public class CodeGenerator {
         }
     }
 
-    private void assignStatement(AssignmentStatement assignStatement) {
-        if (assignStatement.getExpression() instanceof BinaryExpression) {
-            binary((BinaryExpression) assignStatement.getExpression());
-        } else if (assignStatement.getExpression() instanceof UnaryExpression) {
-            unary((UnaryExpression) assignStatement.getExpression());
-        } else if (assignStatement.getExpression() instanceof NumberExpression) {
-            num((NumberExpression) assignStatement.getExpression());
-        } else if (assignStatement.getExpression() instanceof VariableExpression) {
-            var((VariableExpression) assignStatement.getExpression());
-        } else if (assignStatement.getExpression() instanceof DefExpression) {
-            defCall((DefExpression) assignStatement.getExpression());
+    private void generateExpression(Expression expression) {
+        if (expression instanceof BinaryExpression) {
+            binary((BinaryExpression) expression);
+        } else if (expression instanceof UnaryExpression) {
+            unary((UnaryExpression) expression);
+        } else if (expression instanceof NumberExpression) {
+            num((NumberExpression) expression);
+        } else if (expression instanceof VariableExpression) {
+            var((VariableExpression) expression);
+        } else if (expression instanceof DefExpression) {
+            defCall((DefExpression) expression);
         }
+    }
+
+    private void assignStatement(AssignmentStatement assignStatement) {
+        generateExpression(assignStatement.getExpression());
         int index = 4 * (Variables.indexOf(assignStatement.getVariable()) + 1);
         code.append("\tpop eax\r\n");
         code.append(String.format("\tmov dword ptr[ebp + %d], eax\r\n", index));
@@ -103,17 +106,7 @@ public class CodeGenerator {
 
     private void ifStatement(IfStatement ifStatement) {
         int thisCondCount = conditionalCount++;
-        if (ifStatement.getExpression() instanceof BinaryExpression) {
-            binary((BinaryExpression) ifStatement.getExpression());
-        } else if (ifStatement.getExpression() instanceof UnaryExpression) {
-            unary((UnaryExpression) ifStatement.getExpression());
-        } else if (ifStatement.getExpression() instanceof NumberExpression) {
-            num((NumberExpression) ifStatement.getExpression());
-        } else if (ifStatement.getExpression() instanceof VariableExpression) {
-            var((VariableExpression) ifStatement.getExpression());
-        } else if (ifStatement.getExpression() instanceof DefExpression) {
-            defCall((DefExpression) ifStatement.getExpression());
-        }
+        generateExpression(ifStatement.getExpression());
         code.append("\tpop eax\r\n");
         code.append("\tcmp eax, 0\r\n");
         if (ifStatement.getElseStatement() != null) {
@@ -130,17 +123,7 @@ public class CodeGenerator {
     }
 
     private void ret(ReturnStatement ret) {
-        if (ret.getExpression() instanceof BinaryExpression) {
-            binary((BinaryExpression) ret.getExpression());
-        } else if (ret.getExpression() instanceof UnaryExpression) {
-            unary((UnaryExpression) ret.getExpression());
-        } else if (ret.getExpression() instanceof NumberExpression) {
-            num((NumberExpression) ret.getExpression());
-        } else if (ret.getExpression() instanceof VariableExpression) {
-            var((VariableExpression) ret.getExpression());
-        } else if (ret.getExpression() instanceof DefExpression) {
-            defCall((DefExpression) ret.getExpression());
-        }
+        generateExpression(ret.getExpression());
         code.append("\tpop eax\r\n");
         code.append("\tpop ebp\r\n");
         code.append("\tpop ebx\r\n".repeat(Variables.size()));
@@ -148,36 +131,8 @@ public class CodeGenerator {
     }
 
     private void binary(BinaryExpression bin) {
-        if (bin.getExpr1() instanceof BinaryExpression) {
-            binary((BinaryExpression) bin.getExpr1());
-        }
-        if (bin.getExpr1() instanceof UnaryExpression) {
-            unary((UnaryExpression) bin.getExpr1());
-        }
-        if (bin.getExpr1() instanceof NumberExpression) {
-            num((NumberExpression) bin.getExpr1());
-        }
-        if (bin.getExpr1() instanceof VariableExpression) {
-            var((VariableExpression) bin.getExpr1());
-        }
-        if (bin.getExpr1() instanceof DefExpression) {
-            defCall((DefExpression) bin.getExpr1());
-        }
-        if (bin.getExpr2() instanceof BinaryExpression) {
-            binary((BinaryExpression) bin.getExpr2());
-        }
-        if (bin.getExpr2() instanceof UnaryExpression) {
-            unary((UnaryExpression) bin.getExpr2());
-        }
-        if (bin.getExpr2() instanceof NumberExpression) {
-            num((NumberExpression) bin.getExpr2());
-        }
-        if (bin.getExpr2() instanceof VariableExpression) {
-            var((VariableExpression) bin.getExpr2());
-        }
-        if (bin.getExpr2() instanceof DefExpression) {
-            defCall((DefExpression) bin.getExpr2());
-        }
+        generateExpression(bin.getExpr1());
+        generateExpression(bin.getExpr2());
         code.append("\tpop ebx\r\n");
         code.append("\tpop eax\r\n");
         if (bin.getOperation() == '-') {
@@ -197,21 +152,7 @@ public class CodeGenerator {
     }
 
     private void unary(UnaryExpression un) {
-        if (un.getExpr() instanceof BinaryExpression) {
-            binary((BinaryExpression) un.getExpr());
-        }
-        if (un.getExpr() instanceof NumberExpression) {
-            num((NumberExpression) un.getExpr());
-        }
-        if (un.getExpr() instanceof VariableExpression) {
-            var((VariableExpression) un.getExpr());
-        }
-        if (un.getExpr() instanceof UnaryExpression) {
-            unary((UnaryExpression) un.getExpr());
-        }
-        if (un.getExpr() instanceof DefExpression) {
-            defCall((DefExpression) un.getExpr());
-        }
+        generateExpression(un.getExpr());
         code.append("\tpop eax\r\n");
         code.append("\tneg eax\r\n");
         code.append("\tpush eax\r\n");
