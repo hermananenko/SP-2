@@ -3,6 +3,7 @@ package parser;
 import ast.*;
 
 import java.util.ArrayList;
+import java.util.Hashtable;
 import java.util.List;
 
 public class Parser {
@@ -13,11 +14,12 @@ public class Parser {
     private final int size;
     private int pos;
 
-    private final List<String> defNames = new ArrayList<>();
+    private final List<List<String>> defNames;
 
     public Parser(List<Token> tokens) {
         this.tokens = tokens;
         size = tokens.size();
+        defNames = new ArrayList<>();
     }
 
     public List<Statement> parse() {
@@ -27,10 +29,40 @@ public class Parser {
                 result.add(defStatement());
             } else if (get(0).getType() == TokenType.ID) {
                 String name = get(0).getText();
+                int line = get(0).getLine();
+                int paramCount = 0;
+                List<Expression> parameters = null;
                 consume(TokenType.ID);
                 consume(TokenType.OPEN_BRACKET);
-                consume(TokenType.CLOSE_BRACKET);
-                result.add(new DefStatement(name, null));
+                if (!match(TokenType.CLOSE_BRACKET)) {
+                    parameters = new ArrayList<>();
+                    while (!match(TokenType.CLOSE_BRACKET)) {
+                        Expression parameter = expression(new BodyStatement(), new ArrayList<>());
+                        if (get(0).getType() != TokenType.CLOSE_BRACKET) {
+                            consume(TokenType.COMMA);
+                        }
+                        parameters.add(parameter);
+                        paramCount++;
+                    }
+                }
+
+                boolean defIsExists = false;
+                for (List<String> def : defNames) {
+                    if (def.contains(name)) {
+                        for (String numOfIndexes : def) {
+                            if (Integer.toString(paramCount).equals(numOfIndexes)) {
+                                defIsExists = true;
+                            }
+                        }
+                    }
+                }
+
+                if (defIsExists) {
+                    result.add(new DefExpression(name, parameters));
+                } else {
+                    String message = String.format("Рядок %d: функцію %s(%d params) не знайдено", line, name, paramCount);
+                    throw new SyntaxException(message);
+                }
             }
         }
         return result;
@@ -38,14 +70,40 @@ public class Parser {
 
     private Statement defStatement() {
         String name = get(0).getText();
+        int paramCount = 0;
+        List<String> parameters = null;
         consume(TokenType.ID); consume(TokenType.OPEN_BRACKET);
-        consume(TokenType.CLOSE_BRACKET); consume(TokenType.COLON);
-        defNames.add(name);
+        if (!match(TokenType.CLOSE_BRACKET)) {
+            parameters = new ArrayList<>();
+            while (!match(TokenType.CLOSE_BRACKET)) {
+                String paramName = consume(TokenType.ID).getText();
+                if (get(0).getType() != TokenType.CLOSE_BRACKET) {
+                    consume(TokenType.COMMA);
+                }
+                parameters.add(paramName);
+                paramCount++;
+            }
+        }
+        consume(TokenType.COLON);
 
-        return new DefStatement(name, block(null));
+        boolean defNameIsExists = false;
+        for (List<String> def : defNames) {
+            if (def.contains(name)) {
+                def.add(Integer.toString(paramCount));
+                defNameIsExists = true;
+                break;
+            }
+        }
+        if (!defNameIsExists) {
+            defNames.add(new ArrayList<>());
+            defNames.get(defNames.size() - 1).add(name);
+            defNames.get(defNames.size() - 1).add(Integer.toString(paramCount));
+        }
+
+        return new DefStatement(name, block(null, parameters), parameters);
     }
 
-    private Statement block(BodyStatement parent) {
+    private Statement block(BodyStatement parent, List<String> params) {
         final BodyStatement block = new BodyStatement();
         if (parent != null) {
             for (String parentVar : parent.getVariables()) {
@@ -74,11 +132,11 @@ public class Parser {
             }
 
             if (match(TokenType.IF)) {
-                block.add(ifElse(block));
+                block.add(ifElse(block, params));
             } else if (match(TokenType.RETURN)) {
-                block.add(returnStatement(block));
+                block.add(returnStatement(block, params));
             } else if (get(1).getType() == TokenType.EQ) {
-                block.add(assignmentStatement(block));
+                block.add(assignmentStatement(block, params));
             } else {
                 throw new SyntaxException(String.format("Рядок %d : Невідома операція!", get(0).getLine()));
             }
@@ -89,7 +147,7 @@ public class Parser {
         return block;
     }
 
-    private Statement assignmentStatement(BodyStatement block) {
+    private Statement assignmentStatement(BodyStatement block, List<String> params) {
         final Token current = get(0);
 
         if (match(TokenType.ID) && get(0).getType() == TokenType.EQ) {
@@ -98,21 +156,21 @@ public class Parser {
             if (!block.isExist(variable)) {
                 block.addVariable(variable);
             }
-            return new AssignmentStatement(variable, expression(block));
+            return new AssignmentStatement(variable, expression(block, params));
         }
         return null;
     }
 
-    private Statement ifElse(BodyStatement block) {
+    private Statement ifElse(BodyStatement block, List<String> params) {
         consume(TokenType.OPEN_BRACKET);
-        final Expression condition = expression(block);
+        final Expression condition = expression(block, params);
         consume(TokenType.CLOSE_BRACKET);
         consume(TokenType.COLON);
-        final Statement ifStatement = block(block);
+        final Statement ifStatement = block(block, params);
         final Statement elseStatement;
         if (match(TokenType.ELSE)) {
             match(TokenType.COLON);
-            elseStatement = block(block);
+            elseStatement = block(block, params);
             for (String ifVar : ((BodyStatement) ifStatement).getVariables()) {
                 for (String elsVar : ((BodyStatement) elseStatement).getVariables()) {
                     if (ifVar.equals(elsVar) && !block.isExist(ifVar)) {
@@ -126,20 +184,20 @@ public class Parser {
         return new IfStatement(condition, ifStatement, elseStatement);
     }
 
-    private Statement returnStatement(BodyStatement block) {
-            return new ReturnStatement(expression(block));
+    private Statement returnStatement(BodyStatement block, List<String> params) {
+            return new ReturnStatement(expression(block, params));
     }
 
-    private Expression expression(BodyStatement block) {
-        return logical(block);
+    private Expression expression(BodyStatement block, List<String> params) {
+        return logical(block, params);
     }
 
-    private Expression logical(BodyStatement block) {
-        Expression result = subtraction(block);
+    private Expression logical(BodyStatement block, List<String> params) {
+        Expression result = subtraction(block, params);
 
         while (true) {
             if (match(TokenType.OR)) {
-                result = new BinaryExpression('o', result, subtraction(block));
+                result = new BinaryExpression('o', result, subtraction(block, params));
                 continue;
             }
             break;
@@ -147,12 +205,12 @@ public class Parser {
         return result;
     }
 
-    private Expression subtraction(BodyStatement block) {
-        Expression result = division(block);
+    private Expression subtraction(BodyStatement block, List<String> params) {
+        Expression result = division(block, params);
 
         while (true) {
             if (match(TokenType.MINUS)) {
-                result = new BinaryExpression('-', result, division(block));
+                result = new BinaryExpression('-', result, division(block, params));
                 continue;
             }
             break;
@@ -160,16 +218,16 @@ public class Parser {
         return result;
     }
 
-    private Expression division(BodyStatement block) {
-        Expression result = unary(block);
+    private Expression division(BodyStatement block, List<String> params) {
+        Expression result = unary(block, params);
 
         while (true) {
             if (match(TokenType.DIVISION)) {
-                result = new BinaryExpression('/', result, unary(block));
+                result = new BinaryExpression('/', result, unary(block, params));
                 continue;
             }
             if (match(TokenType.MUL)) {
-                result = new BinaryExpression('*', result, unary(block));
+                result = new BinaryExpression('*', result, unary(block, params));
                 continue;
             }
             break;
@@ -177,32 +235,61 @@ public class Parser {
         return result;
     }
 
-    private Expression unary(BodyStatement block) {
+    private Expression unary(BodyStatement block, List<String> params) {
         if (match(TokenType.MINUS)) {
             if (get(0).getType() == TokenType.MINUS) {
-                return new UnaryExpression('-', unary(block));
+                return new UnaryExpression('-', unary(block, params));
             }
-            return new UnaryExpression('-', primary(block));
+            return new UnaryExpression('-', primary(block, params));
         }
-        return primary(block);
+        return primary(block, params);
     }
 
-    private Expression primary(BodyStatement block) {
+    private Expression primary(BodyStatement block, List<String> params) {
         final Token current = get(0);
         if (match(TokenType.NUM)) {
             return new NumberExpression(Integer.parseInt(current.getText()));
         } else if (match(TokenType.ID)){
+            String name = current.getText();
             if (get(0).getType() == TokenType.OPEN_BRACKET) {
+                List<Expression> parameters = null;
+                int paramCount = 0;
                 consume(TokenType.OPEN_BRACKET);
-                consume(TokenType.CLOSE_BRACKET);
-                if (defNames.contains(current.getText())) {
-                    return new DefExpression(current.getText());
-                } else {
-                    throw new SyntaxException(String.format("Рядок %d : Функції \"%s\" не знайдено!", current.getLine(), current.getText()));
+                if (!match(TokenType.CLOSE_BRACKET)) {
+                    parameters = new ArrayList<>();
+                    while (!match(TokenType.CLOSE_BRACKET)) {
+                        Expression parameter = expression(new BodyStatement(), params);
+                        if (get(0).getType() != TokenType.CLOSE_BRACKET) {
+                            consume(TokenType.COMMA);
+                        }
+                        parameters.add(parameter);
+                        paramCount++;
+                    }
+
+                    boolean defIsExists = false;
+                    for (List<String> def : defNames) {
+                        if (def.contains(name)) {
+                            for (String numOfIndexes : def) {
+                                if (Integer.toString(paramCount).equals(numOfIndexes)) {
+                                    defIsExists = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if (defIsExists) {
+                        return new DefExpression(name, parameters);
+                    } else {
+                        String message = String.format("Рядок %d: функцію %s(%d params) не знайдено", get(0).getLine(), name, paramCount);
+                        throw new SyntaxException(message);
+                    }
                 }
             }
+
             if (block.isExist(current.getText())) {
-                return new VariableExpression(current.getText());
+                return new VariableExpression(name);
+            } else if (params.contains(name)) {
+                return new ParameterExpression(name);
             } else {
                 throw new SyntaxException(String.format("Рядок %d : Змінної \"%s\" не знайдено!", current.getLine(), current.getText()));
             }
@@ -214,7 +301,7 @@ public class Parser {
             return new NumberExpression(current.getText().charAt(0));
         }
         if (match(TokenType.OPEN_BRACKET)) {
-            Expression result = expression(block);
+            Expression result = expression(block, params);
             match(TokenType.CLOSE_BRACKET);
             return result;
         }

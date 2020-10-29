@@ -110,6 +110,10 @@ public class Lexer {
                         addToken(TokenType.MUL);
                         next();
                         break;
+                    case ',':
+                        addToken(TokenType.COMMA);
+                        next();
+                        break;
                     default:
                         throw new SyntaxException(String.format("Рядок %d : невідомий символ '%c'. Компіляцію зупинено.", line, current));
                 }

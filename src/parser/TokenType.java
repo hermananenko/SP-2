@@ -21,5 +21,6 @@ public enum TokenType {
     MUL,
     IF,
     ELSE,
-
+    COMMA,
+    INCREMENT
 }

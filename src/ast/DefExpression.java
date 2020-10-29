@@ -1,10 +1,14 @@
 package ast;
 
-public class DefExpression implements Expression {
-    private final String name;
+import java.util.List;
 
-    public DefExpression(String name) {
+public class DefExpression implements Expression, Statement {
+    private final String name;
+    private final List<Expression> parameters;
+
+    public DefExpression(String name, List<Expression> parameters) {
         this.name = name;
+        this.parameters = parameters;
     }
 
     public String getName() {
