@@ -14,4 +14,8 @@ public class DefExpression implements Expression, Statement {
     public String getName() {
         return name;
     }
+
+    public List<Expression> getParameters() {
+        return parameters;
+    }
 }

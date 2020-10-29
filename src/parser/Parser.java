@@ -31,11 +31,10 @@ public class Parser {
                 String name = get(0).getText();
                 int line = get(0).getLine();
                 int paramCount = 0;
-                List<Expression> parameters = null;
+                List<Expression> parameters = new ArrayList<>();
                 consume(TokenType.ID);
                 consume(TokenType.OPEN_BRACKET);
                 if (!match(TokenType.CLOSE_BRACKET)) {
-                    parameters = new ArrayList<>();
                     while (!match(TokenType.CLOSE_BRACKET)) {
                         Expression parameter = expression(new BodyStatement(), new ArrayList<>());
                         if (get(0).getType() != TokenType.CLOSE_BRACKET) {
@@ -71,10 +70,9 @@ public class Parser {
     private Statement defStatement() {
         String name = get(0).getText();
         int paramCount = 0;
-        List<String> parameters = null;
+        List<String> parameters = new ArrayList<>();
         consume(TokenType.ID); consume(TokenType.OPEN_BRACKET);
         if (!match(TokenType.CLOSE_BRACKET)) {
-            parameters = new ArrayList<>();
             while (!match(TokenType.CLOSE_BRACKET)) {
                 String paramName = consume(TokenType.ID).getText();
                 if (get(0).getType() != TokenType.CLOSE_BRACKET) {
@@ -135,7 +133,7 @@ public class Parser {
                 block.add(ifElse(block, params));
             } else if (match(TokenType.RETURN)) {
                 block.add(returnStatement(block, params));
-            } else if (get(1).getType() == TokenType.EQ) {
+            } else if (get(1).getType() == TokenType.EQ || get(1).getType() == TokenType.MUL_EQ) {
                 block.add(assignmentStatement(block, params));
             } else {
                 throw new SyntaxException(String.format("Рядок %d : Невідома операція!", get(0).getLine()));
@@ -150,15 +148,23 @@ public class Parser {
     private Statement assignmentStatement(BodyStatement block, List<String> params) {
         final Token current = get(0);
 
-        if (match(TokenType.ID) && get(0).getType() == TokenType.EQ) {
+        if (match(TokenType.ID)) {
             final String variable = current.getText();
-            consume(TokenType.EQ);
-            if (!block.isExist(variable)) {
-                block.addVariable(variable);
+            if (match(TokenType.EQ)) {
+                if (!block.isExist(variable)) {
+                    block.addVariable(variable);
+                }
+                return new AssignmentStatement(variable, expression(block, params), 'n');
+            } else if (match(TokenType.MUL_EQ)) {
+                if (block.isExist(variable)) {
+                    return new AssignmentStatement(variable, expression(block, params), '*');
+                } else {
+                    String message = String.format("Рядок %d: змінної \"%s\" не знайдено!", current.getLine(), variable);
+                    throw new SyntaxException(message);
+                }
             }
-            return new AssignmentStatement(variable, expression(block, params));
         }
-        return null;
+        throw new SyntaxException("Помилка яка ніколи не виникне:)");
     }
 
     private Statement ifElse(BodyStatement block, List<String> params) {
@@ -252,11 +258,10 @@ public class Parser {
         } else if (match(TokenType.ID)){
             String name = current.getText();
             if (get(0).getType() == TokenType.OPEN_BRACKET) {
-                List<Expression> parameters = null;
+                List<Expression> parameters = new ArrayList<>();;
                 int paramCount = 0;
                 consume(TokenType.OPEN_BRACKET);
                 if (!match(TokenType.CLOSE_BRACKET)) {
-                    parameters = new ArrayList<>();
                     while (!match(TokenType.CLOSE_BRACKET)) {
                         Expression parameter = expression(new BodyStatement(), params);
                         if (get(0).getType() != TokenType.CLOSE_BRACKET) {

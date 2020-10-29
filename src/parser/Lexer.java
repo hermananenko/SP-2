@@ -107,7 +107,12 @@ public class Lexer {
                         next();
                         break;
                     case '*':
-                        addToken(TokenType.MUL);
+                        if (peek(1) == '=') {
+                            addToken(TokenType.MUL_EQ);
+                            next();
+                        } else {
+                            addToken(TokenType.MUL);
+                        }
                         next();
                         break;
                     case ',':

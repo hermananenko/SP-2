@@ -8,16 +8,18 @@ public class CodeGenerator {
     private final List<Statement> ast;
     private final StringBuilder code = new StringBuilder();
     private List<String> Variables;
+    private List<String> Parameters;
 
     private int conditionalCount = 0;
 
     public CodeGenerator(List<Statement> ast) {
         this.ast = ast;
 
-        String nameCallFunction = "test";
+        DefExpression callFunction = null;
         for (Statement st : ast) {
-            if (((DefStatement) st).getBody() == null) {
-                nameCallFunction = ((DefStatement) st).getName();
+            if (st instanceof DefExpression) {
+                callFunction = (DefExpression) st;
+                break;
             }
         }
 
@@ -38,7 +40,7 @@ public class CodeGenerator {
         code.append("orp endp\r\n\r\n");
         generate();
         code.append("start:\r\n");
-        code.append(String.format("\tinvoke %s\r\n", nameCallFunction));
+        defCall(callFunction);
         code.append("\tfn MessageBoxA,0,str$(eax),\"1_6-2-Java-IO-83-Ananenko\",MB_OK\r\n");
         code.append("\tinvoke ExitProcess,0\r\n");
         code.append("end start");
@@ -50,7 +52,7 @@ public class CodeGenerator {
 
     private void generate() {
         for (Statement st : ast) {
-            if (((DefStatement) st).getBody() != null) {
+            if (st instanceof DefStatement) {
                 def((DefStatement) st);
             }
         }
@@ -59,11 +61,10 @@ public class CodeGenerator {
     private void def(DefStatement def) {
         code.append(String.format("%s proc\r\n", def.getName()));
         Variables = ((BodyStatement) def.getBody()).getVariables();
-        for (String str : Variables) {
-            code.append("\tpush 0\r\n");
-        }
+        Parameters = def.getParameters();
         code.append("\tpush ebp\r\n");
         code.append("\tmov ebp, esp\r\n");
+        code.append(String.format("\tsub esp, %d\r\n", Variables.size() * 4));
         body(((BodyStatement) def.getBody()));
         code.append(String.format("%s endp\r\n\r\n", def.getName()));
     }
@@ -94,14 +95,22 @@ public class CodeGenerator {
             var((VariableExpression) expression);
         } else if (expression instanceof DefExpression) {
             defCall((DefExpression) expression);
+        } else if (expression instanceof ParameterExpression) {
+            parameter((ParameterExpression) expression);
         }
     }
 
     private void assignStatement(AssignmentStatement assignStatement) {
         generateExpression(assignStatement.getExpression());
         int index = 4 * (Variables.indexOf(assignStatement.getVariable()) + 1);
+        if (assignStatement.getOption() == '*') {
+            code.append(String.format("\tmov eax, [ebp-%d]\r\n", index));
+            code.append("\tpop ebx\r\n");
+            code.append("\timul eax, ebx\r\n");
+            code.append("\tpush eax\r\n");
+        }
         code.append("\tpop eax\r\n");
-        code.append(String.format("\tmov dword ptr[ebp + %d], eax\r\n", index));
+        code.append(String.format("\tmov dword ptr[ebp-%d], eax\r\n", index));
     }
 
     private void ifStatement(IfStatement ifStatement) {
@@ -125,9 +134,8 @@ public class CodeGenerator {
     private void ret(ReturnStatement ret) {
         generateExpression(ret.getExpression());
         code.append("\tpop eax\r\n");
-        code.append("\tpop ebp\r\n");
-        code.append("\tpop ebx\r\n".repeat(Variables.size()));
-        code.append("\tret\r\n");
+        code.append("\tleave\r\n");
+        code.append(String.format("\tret %d\r\n", 4 * Parameters.size()));
     }
 
     private void binary(BinaryExpression bin) {
@@ -165,12 +173,23 @@ public class CodeGenerator {
 
     private void var(VariableExpression var) {
         int index = 4 * (Variables.indexOf(var.getName()) + 1);
-        code.append(String.format("\tmov eax, [ebp+%d]\r\n", index));
+        code.append(String.format("\tmov eax, [ebp-%d]\r\n", index));
         code.append("\tpush eax\r\n");
     }
 
     private void defCall(DefExpression defExpression) {
+        if (defExpression.getParameters() != null) {
+            for (Expression param : defExpression.getParameters()) {
+                generateExpression(param);
+            }
+        }
         code.append(String.format("\tcall %s\r\n", defExpression.getName()));
+        code.append("\tpush eax\r\n");
+    }
+
+    private void parameter(ParameterExpression parameterExpression) {
+        int index = 4 * (Parameters.indexOf(parameterExpression.getName()) + 1) + 4;
+        code.append(String.format("\tmov eax, [ebp+%d]\r\n", index));
         code.append("\tpush eax\r\n");
     }
 }
