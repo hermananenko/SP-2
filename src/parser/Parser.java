@@ -14,12 +14,12 @@ public class Parser {
     private final int size;
     private int pos;
 
-    private final List<List<String>> defNames;
+    private final Hashtable<String, Integer> defNames;
 
     public Parser(List<Token> tokens) {
         this.tokens = tokens;
         size = tokens.size();
-        defNames = new ArrayList<>();
+        defNames = new Hashtable<String, Integer>();
     }
 
     public List<Statement> parse() {
@@ -45,18 +45,7 @@ public class Parser {
                     }
                 }
 
-                boolean defIsExists = false;
-                for (List<String> def : defNames) {
-                    if (def.contains(name)) {
-                        for (String numOfIndexes : def) {
-                            if (Integer.toString(paramCount).equals(numOfIndexes)) {
-                                defIsExists = true;
-                            }
-                        }
-                    }
-                }
-
-                if (defIsExists) {
+                if (defNames.get(name) == paramCount) {
                     result.add(new DefExpression(name, parameters));
                 } else {
                     String message = String.format("Рядок %d: функцію %s(%d params) не знайдено", line, name, paramCount);
@@ -69,6 +58,7 @@ public class Parser {
 
     private Statement defStatement() {
         String name = get(0).getText();
+        int line = get(0).getLine();
         int paramCount = 0;
         List<String> parameters = new ArrayList<>();
         consume(TokenType.ID); consume(TokenType.OPEN_BRACKET);
@@ -84,18 +74,13 @@ public class Parser {
         }
         consume(TokenType.COLON);
 
-        boolean defNameIsExists = false;
-        for (List<String> def : defNames) {
-            if (def.contains(name)) {
-                def.add(Integer.toString(paramCount));
-                defNameIsExists = true;
-                break;
+        if (defNames.get(name) == null) {
+            defNames.put(name, paramCount);
+        } else {
+            if (defNames.get(name) != paramCount) {
+                String message = String.format("Рядок %d: ім'я функції %s(%d params) вже зайняте", line, name, defNames.get(name));
+                throw new SyntaxException(message);
             }
-        }
-        if (!defNameIsExists) {
-            defNames.add(new ArrayList<>());
-            defNames.get(defNames.size() - 1).add(name);
-            defNames.get(defNames.size() - 1).add(Integer.toString(paramCount));
         }
 
         return new DefStatement(name, block(null, parameters), parameters);
@@ -271,18 +256,7 @@ public class Parser {
                         paramCount++;
                     }
 
-                    boolean defIsExists = false;
-                    for (List<String> def : defNames) {
-                        if (def.contains(name)) {
-                            for (String numOfIndexes : def) {
-                                if (Integer.toString(paramCount).equals(numOfIndexes)) {
-                                    defIsExists = true;
-                                }
-                            }
-                        }
-                    }
-
-                    if (defIsExists) {
+                    if (defNames.get(name) == paramCount) {
                         return new DefExpression(name, parameters);
                     } else {
                         String message = String.format("Рядок %d: функцію %s(%d params) не знайдено", get(0).getLine(), name, paramCount);

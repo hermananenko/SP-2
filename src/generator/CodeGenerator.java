@@ -2,6 +2,7 @@ package generator;
 
 import ast.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class CodeGenerator {
@@ -51,9 +52,24 @@ public class CodeGenerator {
     }
 
     private void generate() {
-        for (Statement st : ast) {
-            if (st instanceof DefStatement) {
-                def((DefStatement) st);
+        List<String> releasedDefs = new ArrayList<>();
+        for (int i = 0; i < ast.size(); i++) {
+            if (ast.get(i) instanceof DefStatement) {
+                DefStatement defStatement = (DefStatement) ast.get(i);
+                String name = defStatement.getName();
+                if (releasedDefs.contains(name)) {
+                    continue;
+                }
+                for (int j = i + 1; j < ast.size(); j++) {
+                    if (ast.get(j) instanceof DefStatement) {
+                        if (((DefStatement) ast.get(j)).getName().equals(name)) {
+                            defStatement = (DefStatement) ast.get(j);
+                        }
+                    }
+                }
+                releasedDefs.add(name);
+
+                def(defStatement);
             }
         }
     }

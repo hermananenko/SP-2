@@ -5,7 +5,7 @@ import java.util.Hashtable;
 import java.util.List;
 
 public class Lexer {
-    private final Hashtable reserved = new Hashtable();
+    private final Hashtable reserved;
 
     private final String input;
     private final int length;
@@ -21,6 +21,7 @@ public class Lexer {
         length = input.length();
 
         tokens = new ArrayList<>();
+        reserved = new Hashtable();
 
         reserve(new Token(TokenType.DEF, "def"));
         reserve(new Token(TokenType.RETURN, "return"));
