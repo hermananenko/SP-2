@@ -27,30 +27,8 @@ public class Parser {
         while (!match(TokenType.EOF)) {
             if (match(TokenType.DEF)) {
                 result.add(defStatement());
-            } else if (get(0).getType() == TokenType.ID) {
-                String name = get(0).getText();
-                int line = get(0).getLine();
-                int paramCount = 0;
-                List<Expression> parameters = new ArrayList<>();
-                consume(TokenType.ID);
-                consume(TokenType.OPEN_BRACKET);
-                if (!match(TokenType.CLOSE_BRACKET)) {
-                    while (!match(TokenType.CLOSE_BRACKET)) {
-                        Expression parameter = expression(new BodyStatement(), new ArrayList<>());
-                        if (get(0).getType() != TokenType.CLOSE_BRACKET) {
-                            consume(TokenType.COMMA);
-                        }
-                        parameters.add(parameter);
-                        paramCount++;
-                    }
-                }
-
-                if (defNames.get(name) == paramCount) {
-                    result.add(new DefExpression(name, parameters));
-                } else {
-                    String message = String.format("Рядок %d: функцію %s(%d params) не знайдено", line, name, paramCount);
-                    throw new SyntaxException(message);
-                }
+            } else if (match(TokenType.ID)) {
+                result.add((Statement) defCall(new ArrayList<>()));
             }
         }
         return result;
@@ -89,8 +67,8 @@ public class Parser {
     private Statement block(BodyStatement parent, List<String> params) {
         final BodyStatement block = new BodyStatement();
         if (parent != null) {
-            for (String parentVar : parent.getVariables()) {
-                block.addVariable(parentVar);
+            for (String parentVar : parent.getLocalVariables()) {
+                block.addLocalVariable(parentVar);
             }
         }
         boolean isFirstIteration = true;
@@ -120,12 +98,20 @@ public class Parser {
                 block.add(returnStatement(block, params));
             } else if (get(1).getType() == TokenType.EQ || get(1).getType() == TokenType.MUL_EQ) {
                 block.add(assignmentStatement(block, params));
+            } else if (match(TokenType.ID) && get(0).getType() == TokenType.OPEN_BRACKET) {
+                block.add((Statement) defCall(params));
             } else {
                 throw new SyntaxException(String.format("Рядок %d : Невідома операція!", get(0).getLine()));
             }
 
             isFirstIteration = false;
             currInd = 0;
+        }
+
+        if (parent != null) {
+            for (String localVar : block.getLocalVariables()) {
+                parent.addAllVariable(localVar);
+            }
         }
         return block;
     }
@@ -137,7 +123,7 @@ public class Parser {
             final String variable = current.getText();
             if (match(TokenType.EQ)) {
                 if (!block.isExist(variable)) {
-                    block.addVariable(variable);
+                    block.addLocalVariable(variable);
                 }
                 return new AssignmentStatement(variable, expression(block, params), 'n');
             } else if (match(TokenType.MUL_EQ)) {
@@ -162,10 +148,10 @@ public class Parser {
         if (match(TokenType.ELSE)) {
             match(TokenType.COLON);
             elseStatement = block(block, params);
-            for (String ifVar : ((BodyStatement) ifStatement).getVariables()) {
-                for (String elsVar : ((BodyStatement) elseStatement).getVariables()) {
+            for (String ifVar : ((BodyStatement) ifStatement).getLocalVariables()) {
+                for (String elsVar : ((BodyStatement) elseStatement).getLocalVariables()) {
                     if (ifVar.equals(elsVar) && !block.isExist(ifVar)) {
-                        block.addVariable(ifVar);
+                        block.addLocalVariable(ifVar);
                     }
                 }
             }
@@ -181,6 +167,30 @@ public class Parser {
 
     private Expression expression(BodyStatement block, List<String> params) {
         return logical(block, params);
+    }
+
+    private Expression defCall(List<String> params) {
+        String name = get(-1).getText();
+        int line = get(0).getLine();
+        List<Expression> parameters = new ArrayList<>();
+        int paramCount = 0;
+        consume(TokenType.OPEN_BRACKET);
+        if (!match(TokenType.CLOSE_BRACKET)) {
+            while (!match(TokenType.CLOSE_BRACKET)) {
+                Expression parameter = expression(new BodyStatement(), params);
+                if (get(0).getType() != TokenType.CLOSE_BRACKET) {
+                    consume(TokenType.COMMA);
+                }
+                parameters.add(parameter);
+                paramCount++;
+            }
+        }
+        if (defNames.get(name) != null && defNames.get(name) == paramCount) {
+            return new DefExpression(name, parameters);
+        } else {
+            String message = String.format("Рядок %d: функцію %s(%d params) не знайдено", line, name, paramCount);
+            throw new SyntaxException(message);
+        }
     }
 
     private Expression logical(BodyStatement block, List<String> params) {
@@ -243,28 +253,8 @@ public class Parser {
         } else if (match(TokenType.ID)){
             String name = current.getText();
             if (get(0).getType() == TokenType.OPEN_BRACKET) {
-                List<Expression> parameters = new ArrayList<>();;
-                int paramCount = 0;
-                consume(TokenType.OPEN_BRACKET);
-                if (!match(TokenType.CLOSE_BRACKET)) {
-                    while (!match(TokenType.CLOSE_BRACKET)) {
-                        Expression parameter = expression(new BodyStatement(), params);
-                        if (get(0).getType() != TokenType.CLOSE_BRACKET) {
-                            consume(TokenType.COMMA);
-                        }
-                        parameters.add(parameter);
-                        paramCount++;
-                    }
-
-                    if (defNames.get(name) == paramCount) {
-                        return new DefExpression(name, parameters);
-                    } else {
-                        String message = String.format("Рядок %d: функцію %s(%d params) не знайдено", get(0).getLine(), name, paramCount);
-                        throw new SyntaxException(message);
-                    }
-                }
+                return defCall(params);
             }
-
             if (block.isExist(current.getText())) {
                 return new VariableExpression(name);
             } else if (params.contains(name)) {

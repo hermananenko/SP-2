@@ -42,6 +42,7 @@ public class CodeGenerator {
         generate();
         code.append("start:\r\n");
         defCall(callFunction);
+        code.append("\tpop eax\r\n");
         code.append("\tfn MessageBoxA,0,str$(eax),\"1_6-2-Java-IO-83-Ananenko\",MB_OK\r\n");
         code.append("\tinvoke ExitProcess,0\r\n");
         code.append("end start");
@@ -76,7 +77,7 @@ public class CodeGenerator {
 
     private void def(DefStatement def) {
         code.append(String.format("%s proc\r\n", def.getName()));
-        Variables = ((BodyStatement) def.getBody()).getVariables();
+        Variables = ((BodyStatement) def.getBody()).getAllVariables();
         Parameters = def.getParameters();
         code.append("\tpush ebp\r\n");
         code.append("\tmov ebp, esp\r\n");
@@ -195,8 +196,8 @@ public class CodeGenerator {
 
     private void defCall(DefExpression defExpression) {
         if (defExpression.getParameters() != null) {
-            for (Expression param : defExpression.getParameters()) {
-                generateExpression(param);
+            for (int i = defExpression.getParameters().size() - 1; i >= 0; i--) {
+                generateExpression(defExpression.getParameters().get(i));
             }
         }
         code.append(String.format("\tcall %s\r\n", defExpression.getName()));

@@ -120,6 +120,12 @@ public class Lexer {
                         addToken(TokenType.COMMA);
                         next();
                         break;
+                    case '#':
+                        char tempCom = next();
+                        while (tempCom != '\n') {
+                            tempCom = next();
+                        }
+                        break;
                     default:
                         throw new SyntaxException(String.format("Рядок %d : невідомий символ '%c'. Компіляцію зупинено.", line, current));
                 }
