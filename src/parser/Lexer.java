@@ -28,6 +28,9 @@ public class Lexer {
         reserve(new Token(TokenType.OR, "or"));
         reserve(new Token(TokenType.IF, "if"));
         reserve(new Token(TokenType.ELSE, "else"));
+        reserve(new Token(TokenType.WHILE, "while"));
+        reserve(new Token(TokenType.BREAK, "break"));
+        reserve(new Token(TokenType.CONTINUE, "continue"));
     }
 
     private void reserve(Token t) {
@@ -104,7 +107,12 @@ public class Lexer {
                         next();
                         break;
                     case '=':
-                        addToken(TokenType.EQ);
+                        if (peek(1) == '=') {
+                            addToken(TokenType.EQ);
+                            next();
+                        } else {
+                            addToken(TokenType.AS);
+                        }
                         next();
                         break;
                     case '*':
@@ -125,6 +133,22 @@ public class Lexer {
                         while (tempCom != '\n') {
                             tempCom = next();
                         }
+                        break;
+                    case '+':
+                        addToken(TokenType.PLUS);
+                        next();
+                        break;
+                    case '<':
+                        addToken(TokenType.LESS_THAN);
+                        next();
+                        break;
+                    case '>':
+                        addToken(TokenType.GREAT_THAN);
+                        next();
+                        break;
+                    case '%':
+                        addToken(TokenType.MOD);
+                        next();
                         break;
                     default:
                         throw new SyntaxException(String.format("Рядок %d : невідомий символ '%c'. Компіляцію зупинено.", line, current));

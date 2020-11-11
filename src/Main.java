@@ -16,8 +16,9 @@ public class Main {
                 System.out.println(tk);
             }
 
-            List<Statement> stmtList = new Parser(tokenList).parse();
-            String code = new CodeGenerator(stmtList).getCode();
+            Parser parser = new Parser(tokenList);
+            List<Statement> stmtList = parser.parse();
+            String code = new CodeGenerator(stmtList, parser.orIsExist, parser.ltIsExist, parser.gtIsExist, parser.eqIsExist).getCode();
             FileWorker.write("5-2-Java-IO-83-Ananenko.asm", code);
         } catch (Exception e) {
             System.err.println(e.getMessage());

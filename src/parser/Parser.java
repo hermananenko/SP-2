@@ -16,6 +16,11 @@ public class Parser {
 
     private final Hashtable<String, Integer> defNames;
 
+    public boolean orIsExist = false;
+    public boolean ltIsExist = false;
+    public boolean gtIsExist = false;
+    public boolean eqIsExist = false;
+
     public Parser(List<Token> tokens) {
         this.tokens = tokens;
         size = tokens.size();
@@ -61,10 +66,10 @@ public class Parser {
             }
         }
 
-        return new DefStatement(name, block(null, parameters), parameters);
+        return new DefStatement(name, block(null, parameters, false), parameters);
     }
 
-    private Statement block(BodyStatement parent, List<String> params) {
+    private Statement block(BodyStatement parent, List<String> params, boolean isLoop) {
         final BodyStatement block = new BodyStatement();
         if (parent != null) {
             for (String parentVar : parent.getLocalVariables()) {
@@ -85,21 +90,31 @@ public class Parser {
 
             if (currInd != blockInd) {
                 if (get(currInd).getType() == TokenType.ELSE) {
-                    while (match(TokenType.INDENT)) { }
+                    while (match(TokenType.INDENT)) {
+                    }
                 }
                 break;
             } else {
-                while (match(TokenType.INDENT)) { }
+                while (match(TokenType.INDENT)) {
+                }
             }
 
             if (match(TokenType.IF)) {
-                block.add(ifElse(block, params));
+                block.add(ifElse(block, params, isLoop));
             } else if (match(TokenType.RETURN)) {
                 block.add(returnStatement(block, params));
-            } else if (get(1).getType() == TokenType.EQ || get(1).getType() == TokenType.MUL_EQ) {
+            } else if (get(1).getType() == TokenType.AS || get(1).getType() == TokenType.MUL_EQ) {
                 block.add(assignmentStatement(block, params));
             } else if (match(TokenType.ID) && get(0).getType() == TokenType.OPEN_BRACKET) {
                 block.add((Statement) defCall(params));
+            } else if (match(TokenType.WHILE)) {
+                block.add((Statement) whileStatement(block, params));
+            } else if (isLoop) {
+                if (match(TokenType.BREAK)) {
+                    block.add(new BreakStatement());
+                } else if (match(TokenType.CONTINUE)) {
+                    block.add(new ContinueStatement());
+                }
             } else {
                 throw new SyntaxException(String.format("Рядок %d : Невідома операція!", get(0).getLine()));
             }
@@ -121,7 +136,7 @@ public class Parser {
 
         if (match(TokenType.ID)) {
             final String variable = current.getText();
-            if (match(TokenType.EQ)) {
+            if (match(TokenType.AS)) {
                 if (!block.isExist(variable)) {
                     block.addLocalVariable(variable);
                 }
@@ -138,16 +153,16 @@ public class Parser {
         throw new SyntaxException("Помилка яка ніколи не виникне:)");
     }
 
-    private Statement ifElse(BodyStatement block, List<String> params) {
+    private Statement ifElse(BodyStatement block, List<String> params, boolean isLoop) {
         consume(TokenType.OPEN_BRACKET);
         final Expression condition = expression(block, params);
         consume(TokenType.CLOSE_BRACKET);
         consume(TokenType.COLON);
-        final Statement ifStatement = block(block, params);
+        final Statement ifStatement = block(block, params, isLoop);
         final Statement elseStatement;
         if (match(TokenType.ELSE)) {
             match(TokenType.COLON);
-            elseStatement = block(block, params);
+            elseStatement = block(block, params, isLoop);
             for (String ifVar : ((BodyStatement) ifStatement).getLocalVariables()) {
                 for (String elsVar : ((BodyStatement) elseStatement).getLocalVariables()) {
                     if (ifVar.equals(elsVar) && !block.isExist(ifVar)) {
@@ -161,12 +176,21 @@ public class Parser {
         return new IfStatement(condition, ifStatement, elseStatement);
     }
 
+    private Statement whileStatement(BodyStatement block, List<String> params) {
+        consume(TokenType.OPEN_BRACKET);
+        final Expression condition = expression(block, params);
+        consume(TokenType.CLOSE_BRACKET);
+        consume(TokenType.COLON);
+        Statement body = block(block, params, true);
+        return new WhileStatement(condition, body);
+    }
+
     private Statement returnStatement(BodyStatement block, List<String> params) {
             return new ReturnStatement(expression(block, params));
     }
 
     private Expression expression(BodyStatement block, List<String> params) {
-        return logical(block, params);
+        return or(block, params);
     }
 
     private Expression defCall(List<String> params) {
@@ -193,12 +217,35 @@ public class Parser {
         }
     }
 
+    private Expression or(BodyStatement block, List<String> params) {
+        Expression result = logical(block, params);
+
+        while (true) {
+            if (match(TokenType.OR)) {
+                orIsExist = true;
+                result = new BinaryExpression('o', result, logical(block, params));
+                continue;
+            }
+            break;
+        }
+        return result;
+    }
+
     private Expression logical(BodyStatement block, List<String> params) {
         Expression result = subtraction(block, params);
 
         while (true) {
-            if (match(TokenType.OR)) {
-                result = new BinaryExpression('o', result, subtraction(block, params));
+            if (match(TokenType.LESS_THAN)) {
+                ltIsExist = true;
+                result = new BinaryExpression('<', result, subtraction(block, params));
+                continue;
+            } else if (match(TokenType.GREAT_THAN)) {
+                gtIsExist = true;
+                result = new BinaryExpression('>', result, subtraction(block, params));
+                continue;
+            } else if (match(TokenType.EQ)) {
+                eqIsExist = true;
+                result = new BinaryExpression('=', result, subtraction(block, params));
                 continue;
             }
             break;
@@ -212,6 +259,12 @@ public class Parser {
         while (true) {
             if (match(TokenType.MINUS)) {
                 result = new BinaryExpression('-', result, division(block, params));
+                continue;
+            } else if (match(TokenType.PLUS)) {
+                result = new BinaryExpression('+', result, division(block, params));
+                continue;
+            } else if (match(TokenType.MOD)) {
+                result = new BinaryExpression('%', result, division(block, params));
                 continue;
             }
             break;

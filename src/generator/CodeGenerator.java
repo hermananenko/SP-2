@@ -12,8 +12,10 @@ public class CodeGenerator {
     private List<String> Parameters;
 
     private int conditionalCount = 0;
+    private int loopCount = 0;
+    private int currentLoopCount = 0;
 
-    public CodeGenerator(List<Statement> ast) {
+    public CodeGenerator(List<Statement> ast, boolean orIsExist, boolean ltIsExist, boolean gtIsExist, boolean eqIsExist) {
         this.ast = ast;
 
         DefExpression callFunction = null;
@@ -31,14 +33,55 @@ public class CodeGenerator {
         code.append("includelib  C:\\masm32\\lib\\masm32rt.lib\r\n\r\n");
         code.append(".data\r\n");
         code.append(".code\r\n\r\n");
-        code.append("orp proc\r\n");
-        code.append("\tcmp eax, 0\r\n");
-        code.append("\tje _there\r\n");
-        code.append("\tret\r\n");
-        code.append("_there:\r\n");
-        code.append("\tmov eax, ebx\r\n");
-        code.append("\tret\r\n");
-        code.append("orp endp\r\n\r\n");
+
+        if (orIsExist) {
+            code.append("orp proc\r\n");
+            code.append("\tcmp eax, 0\r\n");
+            code.append("\tje _there\r\n");
+            code.append("\tret\r\n");
+            code.append("_there:\r\n");
+            code.append("\tmov eax, ebx\r\n");
+            code.append("\tret\r\n");
+            code.append("orp endp\r\n\r\n");
+        }
+
+        if (eqIsExist) {
+            code.append("eqp proc\r\n");
+            code.append("\tcmp eax, ebx\r\n");
+            code.append("\tje _there\r\n");
+            code.append("\tmov eax, 0\r\n");
+            code.append("\tret\r\n");
+            code.append("_there:\r\n");
+            code.append("\tmov eax, 1\r\n");
+            code.append("\tret\r\n");
+            code.append("eqp endp\r\n\r\n");
+        }
+
+
+        if (ltIsExist) {
+            code.append("ltp proc\r\n");
+            code.append("\tcmp eax, ebx\r\n");
+            code.append("\tjl _there\r\n");
+            code.append("\tmov eax, 0\r\n");
+            code.append("\tret\r\n");
+            code.append("_there:\r\n");
+            code.append("\tmov eax, 1\r\n");
+            code.append("\tret\r\n");
+            code.append("ltp endp\r\n\r\n");
+        }
+
+        if (gtIsExist) {
+            code.append("gtp proc\r\n");
+            code.append("\tcmp eax, ebx\r\n");
+            code.append("\tjg _there\r\n");
+            code.append("\tmov eax, 0\r\n");
+            code.append("\tret\r\n");
+            code.append("_there:\r\n");
+            code.append("\tmov eax, 1\r\n");
+            code.append("\tret\r\n");
+            code.append("gtp endp\r\n\r\n");
+        }
+
         generate();
         code.append("start:\r\n");
         defCall(callFunction);
@@ -98,6 +141,15 @@ public class CodeGenerator {
             if (st instanceof ReturnStatement) {
                 ret((ReturnStatement) st);
             }
+            if (st instanceof WhileStatement) {
+                whileLoop((WhileStatement) st);
+            }
+            if (st instanceof BreakStatement) {
+                code.append(String.format("\tjmp endloop_%d\r\n", currentLoopCount));
+            }
+            if (st instanceof ContinueStatement) {
+                code.append(String.format("\tjmp startloop_%d\r\n", currentLoopCount));
+            }
         }
     }
 
@@ -148,6 +200,19 @@ public class CodeGenerator {
         code.append(String.format("normal_%d:\r\n", thisCondCount));
     }
 
+    private void whileLoop(WhileStatement whileStatement) {
+        int localCount = ++loopCount;
+        currentLoopCount = localCount;
+        code.append(String.format("startloop_%d:\r\n", localCount));
+        generateExpression(whileStatement.getExpression());
+        code.append("\tpop eax\r\n");
+        code.append("\tcmp eax, 0\r\n");
+        code.append(String.format("\tje endloop_%d\r\n", localCount));
+        body((BodyStatement) whileStatement.getBody());
+        code.append(String.format("\tjmp startloop_%d\r\n", localCount));
+        code.append(String.format("endloop_%d:\r\n", localCount));
+    }
+
     private void ret(ReturnStatement ret) {
         generateExpression(ret.getExpression());
         code.append("\tpop eax\r\n");
@@ -172,6 +237,23 @@ public class CodeGenerator {
         }
         if (bin.getOperation() == 'o') {
             code.append("\tcall orp\r\n");
+        }
+        if (bin.getOperation() == '+') {
+            code.append("\tadd eax, ebx\r\n");
+        }
+        if (bin.getOperation() == '<') {
+            code.append("\tcall ltp\r\n");
+        }
+        if (bin.getOperation() == '>') {
+            code.append("\tcall gtp\r\n");
+        }
+        if (bin.getOperation() == '%') {
+            code.append("\tcdq\r\n");
+            code.append("\tidiv ebx\r\n");
+            code.append("\tmov eax, edx\r\n");
+        }
+        if (bin.getOperation() == '=') {
+            code.append("\tcall eqp\r\n");
         }
         code.append("\tpush eax\r\n");
     }
