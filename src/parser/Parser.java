@@ -40,6 +40,7 @@ public class Parser {
     }
 
     private Statement defStatement() {
+        DefStatement def;
         String name = get(0).getText();
         int line = get(0).getLine();
         int paramCount = 0;
@@ -66,7 +67,15 @@ public class Parser {
             }
         }
 
-        return new DefStatement(name, block(null, parameters, false), parameters);
+        def = new DefStatement(name, block(null, parameters, false), parameters);
+
+        if (((BodyStatement) def.getBody()).getAllVariables().isEmpty()) {
+            for (String var : ((BodyStatement) def.getBody()).getLocalVariables()) {
+                ((BodyStatement) def.getBody()).addAllVariable(var);
+            }
+        }
+
+        return def;
     }
 
     private Statement block(BodyStatement parent, List<String> params, boolean isLoop) {
@@ -108,7 +117,7 @@ public class Parser {
             } else if (match(TokenType.ID) && get(0).getType() == TokenType.OPEN_BRACKET) {
                 block.add((Statement) defCall(params));
             } else if (match(TokenType.WHILE)) {
-                block.add((Statement) whileStatement(block, params));
+                block.add(whileStatement(block, params));
             } else if (isLoop) {
                 if (match(TokenType.BREAK)) {
                     block.add(new BreakStatement());
