@@ -69,6 +69,10 @@ public class Lexer {
                                 currIndent++;
                                 temp = next();
                             }
+                            if (temp == '#') {
+                                currIndent = 0;
+                                break;
+                            }
                             if (currIndent > prevIndent) {
                                 indents.add(currIndent);
                             }
