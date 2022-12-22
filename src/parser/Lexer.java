@@ -63,8 +63,8 @@ public class Lexer {
                         next();
                         break;
                     case '\n':
-                        char temp;
-                        if ((temp = next()) == ' ') {
+                        char temp = next();
+                        if (temp == ' ') {
                             while (temp == ' ') {
                                 currIndent++;
                                 temp = next();

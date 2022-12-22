@@ -145,14 +145,15 @@ public class Parser {
 
         if (match(TokenType.ID)) {
             final String variable = current.getText();
+            boolean isParam = params.contains(variable);
             if (match(TokenType.AS)) {
-                if (!block.isExist(variable)) {
+                if (!block.isExist(variable) && !isParam) {
                     block.addLocalVariable(variable);
                 }
-                return new AssignmentStatement(variable, expression(block, params), 'n');
+                return new AssignmentStatement(variable, isParam, expression(block, params), 'n');
             } else if (match(TokenType.MUL_EQ)) {
                 if (block.isExist(variable)) {
-                    return new AssignmentStatement(variable, expression(block, params), '*');
+                    return new AssignmentStatement(variable, isParam, expression(block, params), '*');
                 } else {
                     String message = String.format("Рядок %d: змінної \"%s\" не знайдено!", current.getLine(), variable);
                     throw new SyntaxException(message);

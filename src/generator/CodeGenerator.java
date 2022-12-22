@@ -171,15 +171,21 @@ public class CodeGenerator {
 
     private void assignStatement(AssignmentStatement assignStatement) {
         generateExpression(assignStatement.getExpression());
-        int index = 4 * (Variables.indexOf(assignStatement.getVariable()) + 1);
-        if (assignStatement.getOption() == '*') {
-            code.append(String.format("\tmov eax, [ebp-%d]\r\n", index));
-            code.append("\tpop ebx\r\n");
-            code.append("\timul eax, ebx\r\n");
-            code.append("\tpush eax\r\n");
+        if (assignStatement.isParam()) {
+            code.append("\tpop eax\r\n");
+            int index = 4 * (Parameters.indexOf(assignStatement.getVariable()) + 1) + 4;
+            code.append(String.format("\tmov dword ptr[ebp+%d], eax\r\n", index));
+        } else {
+            int index = 4 * (Variables.indexOf(assignStatement.getVariable()) + 1);
+            if (assignStatement.getOption() == '*') {
+                code.append(String.format("\tmov eax, [ebp-%d]\r\n", index));
+                code.append("\tpop ebx\r\n");
+                code.append("\timul eax, ebx\r\n");
+                code.append("\tpush eax\r\n");
+            }
+            code.append("\tpop eax\r\n");
+            code.append(String.format("\tmov dword ptr[ebp-%d], eax\r\n", index));
         }
-        code.append("\tpop eax\r\n");
-        code.append(String.format("\tmov dword ptr[ebp-%d], eax\r\n", index));
     }
 
     private void ifStatement(IfStatement ifStatement) {
